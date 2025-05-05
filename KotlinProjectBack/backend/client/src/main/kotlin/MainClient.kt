@@ -1,52 +1,54 @@
+@file:Suppress("ktlint:standard:no-wildcard-imports")
+
 package org.example
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
-import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.ByteWriteChannel
-import java.lang.Throwable
-import java.lang.Object
 import io.ktor.utils.io.readUTF8Line
 import io.ktor.utils.io.writeStringUtf8
 import kotlinx.coroutines.*
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
-import org.example.TicTacToeGame
+import kotlinx.serialization.json.Json
 import org.example.IGame
+import org.example.TicTacToeGame
 import java.net.SocketException
 
-class MainClient<T: IGame.InfoForSending>(private val currentGame: IGame<T>, private val ip:String){
-    init{
-        var curSocket:Socket
+class MainClient<T : IGame.InfoForSending>(
+    private val currentGame: IGame<T>,
+    private val ip: String,
+) {
+    init {
+        var curSocket: Socket
         runBlocking {
             curSocket = startClient()
         }
         startCommunicate(curSocket)
     }
 
-    fun startCommunicate(curSocket: Socket){
+    fun startCommunicate(curSocket: Socket) {
         val output = curSocket.openWriteChannel(autoFlush = true)
         val input = curSocket.openReadChannel()
         var currentGameState = IGame.GameState.ONGOING
         runBlocking {
             while (currentGameState == IGame.GameState.ONGOING) {
-                val clientJSon = try {
-                    input.readUTF8Line() ?: throw SocketException("Client disconnected")
-                } catch (e: Exception) {
-                    println("Connection error: ${e.message}")
+                val clientJSon =
+                    try {
+                        input.readUTF8Line() ?: throw SocketException("Client disconnected")
+                    } catch (e: Exception) {
+                        println("Connection error: ${e.message}")
+                        break
+                    }
+                if (clientJSon.startsWith("Game Over:")) {
                     break
                 }
-                if(clientJSon.startsWith("Game Over:"))
-                    break
                 try {
                     println("Earned move from other player")
                     val clientMove = currentGame.dexerializeJsonFromStringToInfoSending(clientJSon)
                     currentGameState = currentGame.makeMove(clientMove)
-                }catch (e: Exception) {
+                } catch (e: Exception) {
                     println("Json parsing error ${e.message}")
                 }
 
-                if (currentGameState != IGame.GameState.ONGOING)
-                {
+                if (currentGameState != IGame.GameState.ONGOING) {
                     output.writeStringUtf8("Game Over: ${currentGameState.name}")
                     break
                 }
@@ -56,7 +58,7 @@ class MainClient<T: IGame.InfoForSending>(private val currentGame: IGame<T>, pri
                 currentGameState = currentGame.makeMove(clentMove)
             }
         }
-        when(currentGameState){
+        when (currentGameState) {
             IGame.GameState.DRAW -> println("Draw")
             IGame.GameState.SERVER_WINS -> println("Server Wins")
             IGame.GameState.CLIENT_WINS -> println("Client Wins")
@@ -64,14 +66,13 @@ class MainClient<T: IGame.InfoForSending>(private val currentGame: IGame<T>, pri
         }
     }
 
-
-    suspend fun startClient(): Socket{
+    suspend fun startClient(): Socket {
         val selector = ActorSelectorManager(Dispatchers.IO)
         val socket = aSocket(selector).tcp().connect(InetSocketAddress(ip, 12345))
         return socket
     }
 }
 
-fun main(){
+fun main() {
     MainClient(TicTacToeGame(), "127.0.0.1")
 }
