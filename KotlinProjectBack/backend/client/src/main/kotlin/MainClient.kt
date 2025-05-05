@@ -3,6 +3,8 @@ import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.ByteWriteChannel
+import java.lang.Throwable
+import java.lang.Object
 import io.ktor.utils.io.readUTF8Line
 import io.ktor.utils.io.writeStringUtf8
 import kotlinx.coroutines.*
@@ -10,6 +12,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
 import org.example.TicTacToeGame
 import org.example.IGame
+import java.net.SocketException
 
 class MainClient<T: IGame.InfoForSending>(private val currentGame: IGame<T>, private val ip:String){
     init{
@@ -26,7 +29,12 @@ class MainClient<T: IGame.InfoForSending>(private val currentGame: IGame<T>, pri
         var currentGameState = IGame.GameState.ONGOING
         runBlocking {
             while (currentGameState == IGame.GameState.ONGOING) {
-                val clientJSon = input.readUTF8Line() ?: break
+                val clientJSon = try {
+                    input.readUTF8Line() ?: throw SocketException("Client disconnected")
+                } catch (e: Exception) {
+                    println("Connection error: ${e.message}")
+                    break
+                }
                 if(clientJSon.startsWith("Game Over:"))
                     break
                 try {
@@ -52,7 +60,7 @@ class MainClient<T: IGame.InfoForSending>(private val currentGame: IGame<T>, pri
             IGame.GameState.DRAW -> println("Draw")
             IGame.GameState.SERVER_WINS -> println("Server Wins")
             IGame.GameState.CLIENT_WINS -> println("Client Wins")
-            else -> println("Incorrect state")
+            else -> println("Incorrect state or other player disconnected")
         }
     }
 

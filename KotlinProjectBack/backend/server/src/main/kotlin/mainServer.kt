@@ -51,7 +51,7 @@ class StartServer<T: IGame.InfoForSending>(private val currentGame: IGame<T>, pr
             IGame.GameState.DRAW -> println("Draw")
             IGame.GameState.SERVER_WINS -> println("Server Wins")
             IGame.GameState.CLIENT_WINS -> println("Client Wins")
-            else -> println("Incorrect state")
+            else -> println("Incorrect state or other player disconnected")
         }
     }
     suspend fun startServer(ip: String): Socket{

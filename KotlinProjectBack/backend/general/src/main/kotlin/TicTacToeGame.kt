@@ -88,7 +88,6 @@ class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
 
     override fun checkWinner(): String?{
         val lines = listOf(
-
             listOf(field[0][0], field[0][1], field[0][2]),
             listOf(field[1][0], field[1][1], field[1][2]),
             listOf(field[2][0], field[2][1], field[2][2]),
@@ -109,9 +108,9 @@ class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
     override fun makeMove(info: IGame.InfoForSending): IGame.GameState {
         val move = info as GameMove
         if(info.action == "сдаться"){
-            when(info.playerId){
-                "X" ->  IGame.GameState.SERVER_WINS
-                "O" -> IGame.GameState.CLIENT_WINS
+            return when(info.playerId){
+                "X" ->  IGame.GameState.CLIENT_WINS
+                "O" -> IGame.GameState.SERVER_WINS
                 else -> throw RuntimeException("invalide playerID: ${info.playerId}")
             }
         }
