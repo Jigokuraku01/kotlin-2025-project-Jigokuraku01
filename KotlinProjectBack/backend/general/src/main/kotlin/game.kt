@@ -6,7 +6,7 @@ import kotlinx.serialization.json.Json
 import kotlin.reflect.KClass
 
 
-sealed interface game<T : game.InfoForSending> {
+sealed interface IGame<T : IGame.InfoForSending> {
     enum class GameState{
         SERVER_WINS, CLIENT_WINS, DRAW, ONGOING
     }
@@ -15,10 +15,12 @@ sealed interface game<T : game.InfoForSending> {
     @Serializable
     sealed class InfoForSending
 
+    fun checkWinner(): String?
     fun returnInfoSendingClass(): KSerializer<out InfoForSending>
     fun getPlayerId(name: String):String
     fun makeMove(info: InfoForSending): GameState
 
+    fun dexerializeJsonFromStringToInfoSending(input: String): InfoForSending
     fun returnClassWithCorrectInput(playerId: String): InfoForSending
     abstract class InnerLogic {
         abstract fun checkIfPosIsGood(info: SettingInfo): Boolean

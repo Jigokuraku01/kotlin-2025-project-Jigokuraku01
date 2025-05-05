@@ -10,7 +10,7 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/client" />
-            <option value="$PROJECT_DIR$/proxy" />
+            <option value="$PROJECT_DIR$/general" />
             <option value="$PROJECT_DIR$/server" />
           </set>
         </option>

@@ -1,6 +1,7 @@
 package org.example
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
+import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.ByteWriteChannel
 import io.ktor.utils.io.readUTF8Line
 import io.ktor.utils.io.writeStringUtf8
@@ -8,28 +9,58 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
 import org.example.TicTacToeGame
-import org.example.game
+import org.example.IGame
 
-class MainClient<T: game.InfoForSending>(private val currentGame: game<T>, private val ip:String){
+class MainClient<T: IGame.InfoForSending>(private val currentGame: IGame<T>, private val ip:String){
     init{
+        var curSocket:Socket
         runBlocking {
-            startClient()
+            curSocket = startClient()
+        }
+        startCommunicate(curSocket)
+    }
+
+    fun startCommunicate(curSocket: Socket){
+        val output = curSocket.openWriteChannel(autoFlush = true)
+        val input = curSocket.openReadChannel()
+        var currentGameState = IGame.GameState.ONGOING
+        runBlocking {
+            while (currentGameState == IGame.GameState.ONGOING) {
+                val clientJSon = input.readUTF8Line() ?: break
+                if(clientJSon.startsWith("Game Over:"))
+                    break
+                try {
+                    println("Earned move from other player")
+                    val clientMove = currentGame.dexerializeJsonFromStringToInfoSending(clientJSon)
+                    currentGameState = currentGame.makeMove(clientMove)
+                }catch (e: Exception) {
+                    println("Json parsing error ${e.message}")
+                }
+
+                if (currentGameState != IGame.GameState.ONGOING)
+                {
+                    output.writeStringUtf8("Game Over: ${currentGameState.name}")
+                    break
+                }
+
+                val clentMove = currentGame.returnClassWithCorrectInput("client")
+                output.writeStringUtf8(Json.encodeToString(clentMove) + "\n")
+                currentGameState = currentGame.makeMove(clentMove)
+            }
+        }
+        when(currentGameState){
+            IGame.GameState.DRAW -> println("Draw")
+            IGame.GameState.SERVER_WINS -> println("Server Wins")
+            IGame.GameState.CLIENT_WINS -> println("Client Wins")
+            else -> println("Incorrect state")
         }
     }
 
-    suspend fun sendGameState(socket: Socket, output: ByteWriteChannel) {
-        val classInfo = currentGame.returnClassWithCorrectInput("client")
-        val json = Json.encodeToString(classInfo)
-        output.writeStringUtf8("$json\n")
-    }
 
-    suspend fun startClient(){
+    suspend fun startClient(): Socket{
         val selector = ActorSelectorManager(Dispatchers.IO)
         val socket = aSocket(selector).tcp().connect(InetSocketAddress(ip, 12345))
-
-        val input = socket.openReadChannel()
-        val output = socket.openWriteChannel(autoFlush = true)
-        sendGameState(socket, output)
+        return socket
     }
 }
 

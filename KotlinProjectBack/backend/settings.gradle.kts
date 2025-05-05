@@ -4,4 +4,4 @@ plugins {
 rootProject.name = "backend"
 include("server")
 include("client")
-include("proxy")
+include("general")
