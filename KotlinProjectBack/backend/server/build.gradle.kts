@@ -17,7 +17,7 @@ dependencies {
     implementation("io.ktor:ktor-network-tls:2.3.7")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
     implementation(project(":general"))
-
+    implementation("io.ktor:ktor-network-tls:2.3.7")
 }
 
 tasks.test {

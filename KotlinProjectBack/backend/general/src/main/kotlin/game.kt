@@ -26,7 +26,7 @@ sealed interface IGame<T : IGame.InfoForSending> {
 
     fun makeMove(info: InfoForSending): GameState
 
-    fun dexerializeJsonFromStringToInfoSending(input: String): InfoForSending
+    fun decerializeJsonFromStringToInfoSending(input: String): InfoForSending
 
     fun returnClassWithCorrectInput(playerId: String): InfoForSending
 

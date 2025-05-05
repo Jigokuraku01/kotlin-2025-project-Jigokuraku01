@@ -1,9 +1,7 @@
 package org.example
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
-import org.example.IGame.InnerLogic.SettingInfo
 
 class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
     private val field = Array(3) { Array(3) { "" } }
@@ -52,21 +50,21 @@ class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
         return ans
     }
 
-    override fun dexerializeJsonFromStringToInfoSending(input: String): GameMove =
-        Json {
-            ignoreUnknownKeys = true
-        }.decodeFromString<GameMove>(input)
+    override fun decerializeJsonFromStringToInfoSending(input: String): GameMove {
+        val json = Json { ignoreUnknownKeys = true }
+        return json.decodeFromString<GameMove>(input)
+    }
 
     private val logic =
         object : IGame.InnerLogic() {
             override fun checkIfPosIsGood(info: SettingInfo): Boolean {
-                val actialInfo = info as SettingInfoImpl
-                return field[actialInfo.x][actialInfo.y].isEmpty()
+                val actualInfo = info as SettingInfoImpl
+                return field[actualInfo.x][actualInfo.y].isEmpty()
             }
 
             override fun setToPos(info: SettingInfo) {
-                val actialInfo = info as SettingInfoImpl
-                field[actialInfo.x][actialInfo.y] = actialInfo.playerId
+                val actualInfo = info as SettingInfoImpl
+                field[actualInfo.x][actualInfo.y] = actualInfo.playerId
             }
         }
 
@@ -113,7 +111,7 @@ class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
             return when (info.playerId) {
                 "X" -> IGame.GameState.CLIENT_WINS
                 "O" -> IGame.GameState.SERVER_WINS
-                else -> throw RuntimeException("invalide playerID: ${info.playerId}")
+                else -> throw RuntimeException("invalid playerID: ${info.playerId}")
             }
         }
         val settingInfo = SettingInfoImpl(playerId = move.playerId, x = move.x, y = move.y)
@@ -122,7 +120,7 @@ class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
         }
         logic.setToPos(settingInfo)
         printField()
-        return when (val winner = checkWinner()) {
+        return when (checkWinner()) {
             "X" -> IGame.GameState.SERVER_WINS
             "O" -> IGame.GameState.CLIENT_WINS
             else -> if (isBoardFull()) IGame.GameState.DRAW else IGame.GameState.ONGOING

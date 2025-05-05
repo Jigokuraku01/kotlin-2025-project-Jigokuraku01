@@ -1,4 +1,4 @@
-@file:Suppress("ktlint:standard:no-wildcard-imports")
+@file:Suppress("kt lint:standard:no-wildcard-imports", "ktlint:standard:no-wildcard-imports")
 
 package org.example
 import io.ktor.network.selector.*
@@ -8,8 +8,6 @@ import io.ktor.utils.io.writeStringUtf8
 import kotlinx.coroutines.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import org.example.IGame
-import org.example.TicTacToeGame
 import java.net.SocketException
 
 class MainClient<T : IGame.InfoForSending>(
@@ -27,8 +25,30 @@ class MainClient<T : IGame.InfoForSending>(
     fun startCommunicate(curSocket: Socket) {
         val output = curSocket.openWriteChannel(autoFlush = true)
         val input = curSocket.openReadChannel()
+
+        suspend fun checkConnection() =
+            try {
+                output.writeStringUtf8("\u0001")
+                true
+            } catch (e: Exception) {
+                false
+            }
+
         var currentGameState = IGame.GameState.ONGOING
         runBlocking {
+            val checkingDelayJob =
+
+                launch {
+                    while (true) {
+                        delay(5000)
+                        if (!checkConnection()) {
+                            println("Connection lost!")
+                            curSocket.close()
+                            break
+                        }
+                    }
+                }
+
             while (currentGameState == IGame.GameState.ONGOING) {
                 val clientJSon =
                     try {
@@ -42,7 +62,7 @@ class MainClient<T : IGame.InfoForSending>(
                 }
                 try {
                     println("Earned move from other player")
-                    val clientMove = currentGame.dexerializeJsonFromStringToInfoSending(clientJSon)
+                    val clientMove = currentGame.decerializeJsonFromStringToInfoSending(clientJSon)
                     currentGameState = currentGame.makeMove(clientMove)
                 } catch (e: Exception) {
                     println("Json parsing error ${e.message}")
@@ -57,7 +77,9 @@ class MainClient<T : IGame.InfoForSending>(
                 output.writeStringUtf8(Json.encodeToString(clentMove) + "\n")
                 currentGameState = currentGame.makeMove(clentMove)
             }
+            checkingDelayJob.cancel()
         }
+
         when (currentGameState) {
             IGame.GameState.DRAW -> println("Draw")
             IGame.GameState.SERVER_WINS -> println("Server Wins")

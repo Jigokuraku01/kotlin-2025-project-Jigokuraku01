@@ -24,8 +24,28 @@ class StartServer<T : IGame.InfoForSending>(
     fun startCommunicate(curSocket: Socket) {
         val output = curSocket.openWriteChannel(autoFlush = true)
         val input = curSocket.openReadChannel()
+
+        suspend fun checkConnection() =
+            try {
+                output.writeStringUtf8("\u0001")
+                true
+            } catch (e: Exception) {
+                false
+            }
         var currentGameState = IGame.GameState.ONGOING
         runBlocking {
+            val checkingDelayJob =
+                launch {
+                    while (true) {
+                        delay(5000)
+                        if (!checkConnection()) {
+                            println("Connection lost!")
+                            curSocket.close()
+                            break
+                        }
+                    }
+                }
+
             while (currentGameState == IGame.GameState.ONGOING) {
                 val serverMove = currentGame.returnClassWithCorrectInput("server")
                 output.writeStringUtf8(Json.encodeToString(serverMove) + "\n")
@@ -41,13 +61,15 @@ class StartServer<T : IGame.InfoForSending>(
                 }
                 try {
                     println("Earned move from other player")
-                    val clientMove = currentGame.dexerializeJsonFromStringToInfoSending(clientJSon)
+                    val clientMove = currentGame.decerializeJsonFromStringToInfoSending(clientJSon)
                     currentGameState = currentGame.makeMove(clientMove)
                 } catch (e: Exception) {
                     println("Json parsing error ${e.message}")
                 }
             }
+            checkingDelayJob.cancel()
         }
+
         when (currentGameState) {
             IGame.GameState.DRAW -> println("Draw")
             IGame.GameState.SERVER_WINS -> println("Server Wins")
