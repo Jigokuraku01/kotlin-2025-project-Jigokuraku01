@@ -1,5 +1,7 @@
 plugins {
     kotlin("jvm") version "2.1.20"
+    id("java-library")
+    `maven-publish`
 }
 
 group = "org.example"
@@ -13,6 +15,8 @@ allprojects {
         mavenCentral()
         google()
     }
+    group = "org.example"
+    version = "1.0"
 }
 
 dependencies {
