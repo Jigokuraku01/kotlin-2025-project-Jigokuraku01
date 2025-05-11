@@ -20,6 +20,7 @@ class StartServer<T : IGame.InfoForSending>(
         var curSocket: Socket
         CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
             curSocket = startServer(port)
+            startCommunicate(curSocket)
         }
     }
 

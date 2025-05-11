@@ -22,8 +22,14 @@ class MainClient<T : IGame.InfoForSending>(
 
     init {
         var curSocket: Socket
-        CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
-            curSocket = startClient(port)
+        val job =
+            CoroutineScope(Dispatchers.IO + SupervisorJob())
+                .launch {
+                    curSocket = startClient(port)
+                    startCommunicate(curSocket)
+                }
+        runBlocking {
+            job.join()
         }
     }
 
@@ -97,7 +103,6 @@ class MainClient<T : IGame.InfoForSending>(
         var currentGameState = IGame.GameState.ONGOING
         runBlocking {
             val checkingDelayJob =
-
                 launch {
                     while (true) {
                         delay(5000)

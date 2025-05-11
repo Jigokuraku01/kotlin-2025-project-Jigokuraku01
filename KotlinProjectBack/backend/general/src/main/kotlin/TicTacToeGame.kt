@@ -3,7 +3,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
+open class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
     private val field = Array(3) { Array(3) { "" } }
 
     @Serializable
@@ -55,6 +55,11 @@ class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
         return json.decodeFromString<GameMove>(input)
     }
 
+    fun getPlayerByPos(
+        i: Int,
+        j: Int,
+    ): String = field[i][j]
+
     private val logic =
         object : IGame.InnerLogic() {
             override fun checkIfPosIsGood(info: SettingInfo): Boolean {
@@ -68,7 +73,7 @@ class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
             }
         }
 
-    override fun printField() {
+    open fun printField() {
         field.forEach { row ->
             println(row.joinToString(" | ") { it.ifEmpty { " " } })
             println("---------")

@@ -5,15 +5,13 @@ package org.example
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
-sealed interface IGame<T : IGame.InfoForSending> {
+interface IGame<T : IGame.InfoForSending> {
     enum class GameState {
         SERVER_WINS,
         CLIENT_WINS,
         DRAW,
         ONGOING,
     }
-
-    fun printField()
 
     @Serializable
     sealed class InfoForSending
