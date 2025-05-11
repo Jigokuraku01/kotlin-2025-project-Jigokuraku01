@@ -16,11 +16,9 @@ class StartServer<T : IGame.InfoForSending>(
 ) {
     private val ip = "0.0.0.0"
 
-    init {
-        var curSocket: Socket
-        CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
-            curSocket = startServer(port)
-            startCommunicate(curSocket)
+    suspend fun startServer() {
+        startServer(port).also { socket ->
+            startCommunicate(socket)
         }
     }
 

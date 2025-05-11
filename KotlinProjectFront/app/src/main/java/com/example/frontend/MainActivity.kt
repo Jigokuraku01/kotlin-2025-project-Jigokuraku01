@@ -26,6 +26,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import org.example.MainClient
 import org.example.StartServer
 
@@ -111,10 +113,20 @@ class MainActivity : ComponentActivity() {
                     isConnected = true
                     status =
                         if (mode == "server") {
-                            StartServer(TicTacToeComposable(this@MainActivity), port.toInt())
+                            lifecycleScope.launch {
+                                StartServer(
+                                    TicTacToeComposable(this@MainActivity),
+                                    port.toInt(),
+                                ).startServer()
+                            }
                             "Сервер запущен на порту $port"
                         } else {
-                            MainClient(TicTacToeComposable(this@MainActivity), port.toInt())
+                            lifecycleScope.launch {
+                                MainClient(
+                                    TicTacToeComposable(this@MainActivity),
+                                    port.toInt(),
+                                ).startClient()
+                            }
                             "Подключено к серверу на порту $port"
                         }
                 },

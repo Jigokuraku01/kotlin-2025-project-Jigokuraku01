@@ -18,18 +18,13 @@ class MainClient<T : IGame.InfoForSending>(
     private val currentGame: IGame<T>,
     private val port: Int,
 ) {
-    private val ip = "127.0.0.1"
+    private val ip = "10.0.2.2"
 
-    init {
-        var curSocket: Socket
-        val job =
-            CoroutineScope(Dispatchers.IO + SupervisorJob())
-                .launch {
-                    curSocket = startClient(port)
-                    startCommunicate(curSocket)
-                }
-        runBlocking {
-            job.join()
+    suspend fun startClient() {
+        startClient(port).also { socket ->
+            if (socket != null) {
+                startCommunicate(socket)
+            }
         }
     }
 
@@ -153,13 +148,25 @@ class MainClient<T : IGame.InfoForSending>(
         }
     }
 
-    suspend fun startClient(port: Int): Socket {
+    suspend fun startClient(port: Int): Socket? {
         val selector = ActorSelectorManager(Dispatchers.IO)
-        val socket =
-            aSocket(selector).tcp().connect(
-                InetSocketAddress(ip, port),
-            )
-        return socket
+        return try {
+            aSocket(selector)
+                .tcp()
+                .connect(
+                    InetSocketAddress(ip, port),
+                ) {
+                    socketTimeout = 10000
+                }.also {
+                    println("Успешное подключение к $ip:$port")
+                }
+        } catch (e: Exception) {
+            println("Ошибка подключения: ${e.message}")
+            selector.close()
+            null
+        } finally {
+            selector.close()
+        }
     }
 }
 
