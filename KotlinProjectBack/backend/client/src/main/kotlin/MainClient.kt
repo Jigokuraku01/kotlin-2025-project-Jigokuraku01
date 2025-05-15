@@ -12,16 +12,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.net.InetAddress
 import java.net.SocketException
 
 class MainClient<T : IGame.InfoForSending>(
     private val currentGame: IGame<T>,
     private val port: Int,
 ) {
-    private val ip = "10.0.2.2"
-
     suspend fun startClient() {
-        startClient(port).also { socket ->
+        val ip = selectGoodServer("127.0.0.")
+        startClient(port, ip).also { socket ->
             if (socket != null) {
                 startCommunicate(socket)
             }
@@ -33,54 +33,40 @@ class MainClient<T : IGame.InfoForSending>(
         val port: Int,
     )
 
-    suspend fun selectServer(): Int {
-        val serversInfo = discoverServers()
-        val possiblePorts = mutableSetOf<String>()
-        serversInfo.forEach { it ->
-            println("Server Ip: ${it.serverName}, port: ${it.port}")
-            possiblePorts.add(it.port.toString())
-        }
-
-        var possiblePort = ""
-        while (!possiblePorts.contains(possiblePort)) {
-            possiblePort = readln().trim()
-            if (!possiblePorts.contains(possiblePort)) {
-                println("incorrect port")
+    fun selectGoodServer(prefIp: String): String {
+        val x = scanNetwork(prefIp)
+        val customScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        for (posIP in x) {
+            customScope.launch {
             }
         }
-
-        return possiblePort.toInt()
+        return "10.0.0.2"
     }
 
-    suspend fun discoverServers(timeout: Long = 3000): List<ServerInfo> {
-        val ans = mutableListOf<ServerInfo>()
-        val selector = ActorSelectorManager(Dispatchers.IO)
+    fun scanNetwork(
+        baseIp: String,
+        timeout: Int = 100,
+    ): List<String> {
+        val activeDevices = mutableListOf<String>()
+
         runBlocking {
-            NetworkConfig.PORT_RANGE.forEach { port ->
-                launch {
-                    withTimeoutOrNull(timeout) {
+            val jobs =
+                (1..254).map { i ->
+                    launch(Dispatchers.IO) {
+                        val host = "$baseIp.$i"
                         try {
-                            val socket =
-                                aSocket(selector).tcp().connect(
-                                    InetSocketAddress(ip, port),
-                                ) {
-                                    socketTimeout = timeout
-                                }
-
-                            val input = socket.openReadChannel()
-                            val response = input.readUTF8Line()
-
-                            if (response?.startsWith("SERVER_ID:") == true) {
-                                ans.add(ServerInfo(serverName = ip, port = port))
+                            if (InetAddress.getByName(host).isReachable(timeout)) {
+                                activeDevices.add(host)
+                                println("Found device: $host")
                             }
-                            socket.close()
                         } catch (e: Exception) {
                         }
                     }
                 }
-            }
+            jobs.joinAll()
         }
-        return ans
+
+        return activeDevices
     }
 
     fun startCommunicate(curSocket: Socket) {
@@ -148,7 +134,10 @@ class MainClient<T : IGame.InfoForSending>(
         }
     }
 
-    suspend fun startClient(port: Int): Socket? {
+    suspend fun startClient(
+        port: Int,
+        ip: String,
+    ): Socket? {
         val selector = ActorSelectorManager(Dispatchers.IO)
         return try {
             aSocket(selector)

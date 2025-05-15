@@ -58,7 +58,12 @@ open class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
     fun getPlayerByPos(
         i: Int,
         j: Int,
-    ): String = field[i][j]
+    ): String? {
+        if (field[i][j] != "X" && field[i][j] != "O") {
+            return null
+        }
+        return field[i][j]
+    }
 
     private val logic =
         object : IGame.InnerLogic() {

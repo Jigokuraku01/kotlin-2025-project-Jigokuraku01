@@ -2,23 +2,23 @@
 <project version="4">
   <component name="deploymentTargetSelector">
     <selectionStates>
-      <SelectionState runConfigName="app">
+      <SelectionState runConfigName="server">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2025-05-11T20:55:26.819758102Z">
+        <DropdownSelection timestamp="2025-05-15T17:01:51.165414Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="LocalEmulator" identifier="path=/home/andrey/.android/avd/Pixel_7.avd" />
+              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\andka\.android\avd\Pixel_7_Pro.avd" />
             </handle>
           </Target>
         </DropdownSelection>
         <DialogSelection />
       </SelectionState>
-      <SelectionState runConfigName="app2">
+      <SelectionState runConfigName="client">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2025-05-11T20:49:27.500232956Z">
+        <DropdownSelection timestamp="2025-05-15T17:04:30.871146700Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="LocalEmulator" identifier="path=/home/andrey/.android/avd/Pixel_7_2.avd" />
+              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\andka\.android\avd\Pixel_7.avd" />
             </handle>
           </Target>
         </DropdownSelection>
