@@ -5,14 +5,17 @@ import io.ktor.network.selector.ActorSelectorManager
 import io.ktor.network.sockets.*
 import io.ktor.network.sockets.Socket
 import io.ktor.network.sockets.aSocket
+import io.ktor.utils.io.cancel
+import io.ktor.utils.io.close
 import io.ktor.utils.io.readUTF8Line
 import io.ktor.utils.io.writeStringUtf8
 import kotlinx.coroutines.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.net.InetAddress
+import java.net.NetworkInterface
 import java.net.SocketException
 
 class MainClient<T : IGame.InfoForSending>(
@@ -20,53 +23,78 @@ class MainClient<T : IGame.InfoForSending>(
     private val port: Int,
 ) {
     suspend fun startClient() {
-        val ip = selectGoodServer("127.0.0.")
-        startClient(port, ip).also { socket ->
-            if (socket != null) {
-                startCommunicate(socket)
+        val customScope = CoroutineScope(Dispatchers.IO)
+        val job =
+            customScope.launch {
+                val ip = selectGoodServer()
+
+                startClient(port, ip).also { socket ->
+                    if (socket != null) {
+                        startCommunicate(socket)
+                    }
+                }
             }
-        }
+        job.join()
     }
 
+    @Serializable
     data class ServerInfo(
         val serverName: String,
         val port: Int,
     )
 
-    fun selectGoodServer(prefIp: String): String {
-        val x = scanNetwork(prefIp)
-        val customScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        for (posIP in x) {
+    suspend fun selectGoodServer(): String {
+        val listOfPossibeIP = mutableListOf<String>()
+        val x = scanNetwork()
+        val customScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val job =
             customScope.launch {
+                x
+                    .map { posIP ->
+                        launch {
+                            try {
+                                val selector = ActorSelectorManager(Dispatchers.IO)
+                                val socket =
+                                    aSocket(selector).tcp().connect(InetSocketAddress(posIP, port)) {
+                                        socketTimeout = 10000
+                                    }
+                                val output = socket.openWriteChannel()
+                                output.writeStringUtf8("took-took")
+                                val input = socket.openReadChannel()
+
+                                val answer = input.readUTF8Line()
+                                if (answer != "ok") {
+                                    throw Exception("some problem")
+                                }
+                                val serverInfoSerializable = input.readUTF8Line() ?: throw Exception()
+                                val serverInfo = Json.decodeFromString<ServerInfo>(serverInfoSerializable)
+                                listOfPossibeIP.add(serverInfo.serverName)
+                                socket.close()
+                            } catch (e: Exception) {
+                            }
+                        }
+                    }.joinAll()
             }
+        job.join()
+        listOfPossibeIP.forEach {
+            println("Possible IP: $it")
         }
-        return "10.0.0.2"
+        print("Введите нужный IP: ")
+        return readln()
     }
 
-    fun scanNetwork(
-        baseIp: String,
-        timeout: Int = 100,
-    ): List<String> {
-        val activeDevices = mutableListOf<String>()
+    fun scanNetwork(): List<String> {
+        val addresses = mutableListOf<String>()
 
-        runBlocking {
-            val jobs =
-                (1..254).map { i ->
-                    launch(Dispatchers.IO) {
-                        val host = "$baseIp.$i"
-                        try {
-                            if (InetAddress.getByName(host).isReachable(timeout)) {
-                                activeDevices.add(host)
-                                println("Found device: $host")
-                            }
-                        } catch (e: Exception) {
-                        }
-                    }
+        NetworkInterface.getNetworkInterfaces()?.toList()?.forEach { networkInterface ->
+            networkInterface.inetAddresses?.toList()?.forEach { inetAddress ->
+                if (!inetAddress.isLoopbackAddress && inetAddress.hostAddress?.contains(":") == false) {
+                    addresses.add(inetAddress.hostAddress)
                 }
-            jobs.joinAll()
+            }
         }
 
-        return activeDevices
+        return addresses
     }
 
     fun startCommunicate(curSocket: Socket) {
@@ -134,7 +162,7 @@ class MainClient<T : IGame.InfoForSending>(
         }
     }
 
-    suspend fun startClient(
+    private suspend fun startClient(
         port: Int,
         ip: String,
     ): Socket? {
@@ -145,9 +173,12 @@ class MainClient<T : IGame.InfoForSending>(
                 .connect(
                     InetSocketAddress(ip, port),
                 ) {
-                    socketTimeout = 10000
+                    socketTimeout = 3000
                 }.also {
                     println("Успешное подключение к $ip:$port")
+                    val output = it.openWriteChannel()
+                    output.writeStringUtf8("connection")
+                    output.close()
                 }
         } catch (e: Exception) {
             println("Ошибка подключения: ${e.message}")
@@ -160,7 +191,9 @@ class MainClient<T : IGame.InfoForSending>(
 }
 
 fun main() {
-    print("Введите порт для подключения")
+    print("Введите порт для подключения: ")
     val port = readln().toInt()
-    MainClient(TicTacToeGame(), port)
+    runBlocking {
+        MainClient(TicTacToeGame(), port).startClient()
+    }
 }

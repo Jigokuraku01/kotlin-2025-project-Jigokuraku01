@@ -11,21 +11,44 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.net.Inet4Address
+import java.net.NetworkInterface
+import java.util.Collections
 import kotlin.io.println
 
-class StartServer<T : IGame.InfoForSending>(
+class MainServer<T : IGame.InfoForSending>(
     private val currentGame: IGame<T>,
     private val port: Int,
 ) {
-    private val ip = "0.0.0.0"
+    private val ip = getLocalIpAddress()
 
-    fun startServer() {
-        val customScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        customScope.launch {
-            startServer(port).also { socket ->
-                startCommunicate(socket)
+    fun getLocalIpAddress(): String? {
+        try {
+            val networkInterfaces = Collections.list(NetworkInterface.getNetworkInterfaces())
+            for (intf in networkInterfaces) {
+                val addresses = Collections.list(intf.inetAddresses)
+                for (addr in addresses) {
+                    if (!addr.isLoopbackAddress && addr is Inet4Address) {
+                        return addr.hostAddress
+                    }
+                }
             }
+        } catch (ex: Exception) {
+            ex.printStackTrace()
         }
+        return null
+    }
+
+    suspend fun startServer() {
+        val customScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val job =
+            customScope.launch {
+                startServer(port).also { socket ->
+                    startCommunicate(socket)
+                }
+            }
+
+        job.join()
     }
 
     @Serializable
@@ -92,6 +115,9 @@ class StartServer<T : IGame.InfoForSending>(
     }
 
     suspend fun startServer(port: Int): Socket {
+        if (ip == null) {
+            throw Exception("IP finding problem")
+        }
         val selector = ActorSelectorManager(Dispatchers.IO)
         val serverSocket = aSocket(selector).tcp().bind(InetSocketAddress(ip, port))
         while (true) {
@@ -99,7 +125,7 @@ class StartServer<T : IGame.InfoForSending>(
 
             val input = clientSocket.openReadChannel()
             val output = clientSocket.openWriteChannel()
-
+            // Если от клиента пршло сообщение, что нужно подключиться - то это connection. Иначе просто проверка на существование сервера
             val message: String? = input.readUTF8Line() ?: break
             if (message == "connection") {
                 input.cancel()
@@ -116,10 +142,12 @@ class StartServer<T : IGame.InfoForSending>(
                         ),
                     ),
                 )
+                output.close()
+                input.cancel()
                 clientSocket.close()
             }
         }
-        return TODO("Provide the return value")
+        return TODO("there is inifinitive while")
     }
 }
 
@@ -132,7 +160,9 @@ fun main() {
         if (port !in NetworkConfig.PORT_RANGE) {
             throw IllegalArgumentException("incorrect port")
         }
-        StartServer(TicTacToeGame(), port)
+        runBlocking {
+            MainServer(TicTacToeGame(), port).startServer()
+        }
     } catch (e: Exception) {
         println("Exception handled: ${e.message}")
     }
