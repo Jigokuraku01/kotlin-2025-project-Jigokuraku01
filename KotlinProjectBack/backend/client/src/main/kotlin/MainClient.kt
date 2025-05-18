@@ -5,6 +5,9 @@ import io.ktor.network.selector.ActorSelectorManager
 import io.ktor.network.sockets.*
 import io.ktor.network.sockets.Socket
 import io.ktor.network.sockets.aSocket
+import io.ktor.util.pipeline.InvalidPhaseException
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.ByteWriteChannel
 import io.ktor.utils.io.cancel
 import io.ktor.utils.io.close
 import io.ktor.utils.io.readUTF8Line
@@ -22,11 +25,15 @@ class MainClient<T : IGame.InfoForSending>(
     private val currentGame: IGame<T>,
     private val port: Int,
 ) {
+    var input: ByteReadChannel? = null
+    var output: ByteWriteChannel? = null
+    val customScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     suspend fun startClient() {
         val customScope = CoroutineScope(Dispatchers.IO)
         val job =
             customScope.launch {
-                val ip = selectGoodServer()
+                val ip = "26.163.86.226" // selectGoodServer()
 
                 startClient(port, ip).also { socket ->
                     if (socket != null) {
@@ -46,7 +53,6 @@ class MainClient<T : IGame.InfoForSending>(
     suspend fun selectGoodServer(): String {
         val listOfPossibeIP = mutableListOf<String>()
         val x = scanNetwork()
-        val customScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val job =
             customScope.launch {
                 x
@@ -58,15 +64,15 @@ class MainClient<T : IGame.InfoForSending>(
                                     aSocket(selector).tcp().connect(InetSocketAddress(posIP, port)) {
                                         socketTimeout = 5000
                                     }
-                                val output = socket.openWriteChannel(autoFlush = true)
-                                output.writeStringUtf8("took-took\n")
-                                val input = socket.openReadChannel()
+                                val tmpOutput = socket.openWriteChannel(autoFlush = true)
+                                tmpOutput.writeStringUtf8("took-took\n")
+                                val tmpInput = socket.openReadChannel()
 
-                                val answer = input.readUTF8Line()
+                                val answer = tmpInput.readUTF8Line()
                                 if (answer != "ok") {
                                     throw Exception("some problem")
                                 }
-                                val serverInfoSerializable = input.readUTF8Line() ?: throw Exception("input failure with ip $posIP")
+                                val serverInfoSerializable = tmpInput.readUTF8Line() ?: throw Exception("input failure with ip $posIP")
                                 val serverInfo = Json.decodeFromString<ServerInfo>(serverInfoSerializable)
                                 listOfPossibeIP.add(serverInfo.serverName)
                                 socket.close()
@@ -80,6 +86,10 @@ class MainClient<T : IGame.InfoForSending>(
             println("Possible IP: $it")
         }
         print("Введите нужный IP: ")
+        val ansIP = readln()
+        if (!listOfPossibeIP.contains(ansIP)) {
+            throw InvalidPhaseException("invalid ip")
+        }
         return readln()
     }
 
@@ -97,62 +107,64 @@ class MainClient<T : IGame.InfoForSending>(
         return addresses
     }
 
-    fun startCommunicate(curSocket: Socket) {
-        val output = curSocket.openWriteChannel(autoFlush = true)
-        val input = curSocket.openReadChannel()
-
+    suspend fun startCommunicate(curSocket: Socket) {
         suspend fun checkConnection() =
             try {
-                output.writeStringUtf8("\u0001")
+                output?.writeStringUtf8("\u0001")
                 true
             } catch (e: Exception) {
                 false
             }
 
         var currentGameState = IGame.GameState.ONGOING
-        runBlocking {
-            val checkingDelayJob =
-                launch {
-                    while (true) {
-                        delay(5000)
-                        if (!checkConnection()) {
-                            println("Connection lost!")
-                            curSocket.close()
-                            break
+        customScope
+            .launch {
+                val checkingDelayJob =
+                    launch {
+                        while (true) {
+                            delay(5000)
+                            if (!checkConnection()) {
+                                println("Connection lost!")
+                                curSocket.close()
+                                break
+                            }
                         }
                     }
-                }
 
-            while (currentGameState == IGame.GameState.ONGOING) {
-                val clientJSon =
-                    try {
-                        input.readUTF8Line() ?: throw SocketException("Client disconnected")
-                    } catch (e: Exception) {
-                        println("Connection error: ${e.message}")
+                while (currentGameState == IGame.GameState.ONGOING) {
+                    val clientJSon =
+                        try {
+                            var str = ""
+                            withTimeoutOrNull(20000) {
+                                str = input?.readUTF8Line() ?: throw SocketException("Server disconnected")
+                            } ?: throw Exception("Server disconnected")
+                            str
+                        } catch (e: Exception) {
+                            println("Connection error: ${e.message}")
+                            break
+                        }
+                    if (clientJSon.startsWith("Game Over:")) {
                         break
                     }
-                if (clientJSon.startsWith("Game Over:")) {
-                    break
-                }
-                try {
-                    println("Earned move from other player")
-                    val clientMove = currentGame.decerializeJsonFromStringToInfoSending(clientJSon)
-                    currentGameState = currentGame.makeMove(clientMove)
-                } catch (e: Exception) {
-                    println("Json parsing error ${e.message}")
-                }
+                    try {
+                        println("Earned move from other player")
+                        val clientMove = currentGame.decerializeJsonFromStringToInfoSending(clientJSon)
+                        currentGameState = currentGame.makeMove(clientMove)
+                    } catch (e: Exception) {
+                        println("Json parsing error ${e.message}")
+                    }
 
-                if (currentGameState != IGame.GameState.ONGOING) {
-                    output.writeStringUtf8("Game Over: ${currentGameState.name}")
-                    break
-                }
+                    if (currentGameState != IGame.GameState.ONGOING) {
+                        output?.writeStringUtf8("Game Over: ${currentGameState.name}")
+                        break
+                    }
 
-                val clentMove = currentGame.returnClassWithCorrectInput("client")
-                output.writeStringUtf8(Json.encodeToString(clentMove) + "\n")
-                currentGameState = currentGame.makeMove(clentMove)
-            }
-            checkingDelayJob.cancel()
-        }
+                    val clentMove = currentGame.returnClassWithCorrectInput("client")
+                    output?.writeStringUtf8(Json.encodeToString(clentMove) + "\n")
+                    currentGameState = currentGame.makeMove(clentMove)
+                }
+                checkingDelayJob.cancel()
+            }.join()
 
         when (currentGameState) {
             IGame.GameState.DRAW -> println("Draw")
@@ -176,16 +188,14 @@ class MainClient<T : IGame.InfoForSending>(
                     socketTimeout = 3000
                 }.also {
                     println("Успешное подключение к $ip:$port")
-                    val output = it.openWriteChannel()
-                    output.writeStringUtf8("connection\n")
-                    output.close()
+                    output = it.openWriteChannel(autoFlush = true)
+                    output?.writeStringUtf8("connection\n")
+                    input = it.openReadChannel()
                 }
         } catch (e: Exception) {
             println("Ошибка подключения: ${e.message}")
             selector.close()
             null
-        } finally {
-            selector.close()
         }
     }
 }

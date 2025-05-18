@@ -3,6 +3,8 @@
 package org.example
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.ByteWriteChannel
 import io.ktor.utils.io.cancel
 import io.ktor.utils.io.close
 import io.ktor.utils.io.readUTF8Line
@@ -23,6 +25,8 @@ class MainServer<T : IGame.InfoForSending>(
     private val currentGame: IGame<T>,
     private val port: Int,
 ) {
+    var input: ByteReadChannel? = null
+    var output: ByteWriteChannel? = null
     private val ip = getLocalIpAddress()
 
     fun getLocalIpAddress(): String? {
@@ -61,12 +65,9 @@ class MainServer<T : IGame.InfoForSending>(
     )
 
     fun startCommunicate(curSocket: Socket) {
-        val output = curSocket.openWriteChannel(autoFlush = true)
-        val input = curSocket.openReadChannel()
-
         suspend fun checkConnection() =
             try {
-                output.writeStringUtf8("\u0001")
+                output?.writeStringUtf8("\u0001")
                 true
             } catch (e: Exception) {
                 false
@@ -87,14 +88,14 @@ class MainServer<T : IGame.InfoForSending>(
 
             while (currentGameState == IGame.GameState.ONGOING) {
                 val serverMove = currentGame.returnClassWithCorrectInput("server")
-                output.writeStringUtf8(Json.encodeToString(serverMove) + "\n")
+                output?.writeStringUtf8(Json.encodeToString(serverMove) + "\n")
                 currentGameState = currentGame.makeMove(serverMove)
                 if (currentGameState != IGame.GameState.ONGOING) {
-                    output.writeStringUtf8("Game Over: ${currentGameState.name}")
+                    output?.writeStringUtf8("Game Over: ${currentGameState.name}")
                     break
                 }
 
-                val clientJSon = input.readUTF8Line() ?: break
+                val clientJSon = input?.readUTF8Line() ?: break
                 if (clientJSon.startsWith("Game Over:")) {
                     break
                 }
@@ -136,7 +137,7 @@ class MainServer<T : IGame.InfoForSending>(
                                     val input = clientSocket.openReadChannel()
                                     val output = clientSocket.openWriteChannel(autoFlush = true)
 
-                                    val message: String? = input.readUTF8Line() ?: throw Exception("input failure")
+                                    val message = input.readUTF8Line() ?: throw Exception("input failure")
                                     if (message == "connection") {
                                         continuation.resume(clientSocket)
                                         return@withTimeoutOrNull
@@ -150,12 +151,14 @@ class MainServer<T : IGame.InfoForSending>(
                                                 ),
                                             ) + "\n",
                                         )
+
                                         output.close()
                                         input.cancel()
                                         clientSocket.close()
                                     }
                                 } catch (e: Exception) {
                                     clientSocket.close()
+                                    throw e
                                 }
                             } ?: run {
                                 clientSocket.close()
