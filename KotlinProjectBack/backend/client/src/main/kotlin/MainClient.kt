@@ -56,17 +56,17 @@ class MainClient<T : IGame.InfoForSending>(
                                 val selector = ActorSelectorManager(Dispatchers.IO)
                                 val socket =
                                     aSocket(selector).tcp().connect(InetSocketAddress(posIP, port)) {
-                                        socketTimeout = 10000
+                                        socketTimeout = 5000
                                     }
-                                val output = socket.openWriteChannel()
-                                output.writeStringUtf8("took-took")
+                                val output = socket.openWriteChannel(autoFlush = true)
+                                output.writeStringUtf8("took-took\n")
                                 val input = socket.openReadChannel()
 
                                 val answer = input.readUTF8Line()
                                 if (answer != "ok") {
                                     throw Exception("some problem")
                                 }
-                                val serverInfoSerializable = input.readUTF8Line() ?: throw Exception()
+                                val serverInfoSerializable = input.readUTF8Line() ?: throw Exception("input failure with ip $posIP")
                                 val serverInfo = Json.decodeFromString<ServerInfo>(serverInfoSerializable)
                                 listOfPossibeIP.add(serverInfo.serverName)
                                 socket.close()
@@ -177,7 +177,7 @@ class MainClient<T : IGame.InfoForSending>(
                 }.also {
                     println("Успешное подключение к $ip:$port")
                     val output = it.openWriteChannel()
-                    output.writeStringUtf8("connection")
+                    output.writeStringUtf8("connection\n")
                     output.close()
                 }
         } catch (e: Exception) {
@@ -191,9 +191,13 @@ class MainClient<T : IGame.InfoForSending>(
 }
 
 fun main() {
-    print("Введите порт для подключения: ")
-    val port = readln().toInt()
-    runBlocking {
-        MainClient(TicTacToeGame(), port).startClient()
+    try {
+        print("Введите порт для подключения: ")
+        val port = readln().toInt()
+        runBlocking {
+            MainClient(TicTacToeGame(), port).startClient()
+        }
+    } catch (e: Exception) {
+        println("Exception handled: ${e.message}")
     }
 }

@@ -8,12 +8,15 @@ import io.ktor.utils.io.close
 import io.ktor.utils.io.readUTF8Line
 import io.ktor.utils.io.writeStringUtf8
 import kotlinx.coroutines.*
+import kotlinx.coroutines.time.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.Collections
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlin.io.println
 
 class MainServer<T : IGame.InfoForSending>(
@@ -118,36 +121,53 @@ class MainServer<T : IGame.InfoForSending>(
         if (ip == null) {
             throw Exception("IP finding problem")
         }
+
         val selector = ActorSelectorManager(Dispatchers.IO)
         val serverSocket = aSocket(selector).tcp().bind(InetSocketAddress(ip, port))
-        while (true) {
-            val clientSocket = serverSocket.accept()
 
-            val input = clientSocket.openReadChannel()
-            val output = clientSocket.openWriteChannel()
-            // Если от клиента пршло сообщение, что нужно подключиться - то это connection. Иначе просто проверка на существование сервера
-            val message: String? = input.readUTF8Line() ?: break
-            if (message == "connection") {
-                input.cancel()
-                output.close()
-                println("Сервер успешно запущен")
-                return clientSocket
-            } else {
-                output.writeStringUtf8("ok")
-                output.writeStringUtf8(
-                    Json.encodeToString<ServerInfo>(
-                        ServerInfo(
-                            serverName = ip,
-                            port = port,
-                        ),
-                    ),
-                )
-                output.close()
-                input.cancel()
-                clientSocket.close()
-            }
+        return suspendCancellableCoroutine { continuation ->
+            CoroutineScope(Dispatchers.IO + SupervisorJob())
+                .launch {
+                    try {
+                        while (true) {
+                            val clientSocket = serverSocket.accept()
+                            withTimeoutOrNull(5000) {
+                                try {
+                                    val input = clientSocket.openReadChannel()
+                                    val output = clientSocket.openWriteChannel(autoFlush = true)
+
+                                    val message: String? = input.readUTF8Line() ?: throw Exception("input failure")
+                                    if (message == "connection") {
+                                        continuation.resume(clientSocket)
+                                        return@withTimeoutOrNull
+                                    } else {
+                                        output.writeStringUtf8("ok\n")
+                                        output.writeStringUtf8(
+                                            Json.encodeToString(
+                                                ServerInfo(
+                                                    serverName = ip,
+                                                    port = port,
+                                                ),
+                                            ) + "\n",
+                                        )
+                                        output.close()
+                                        input.cancel()
+                                        clientSocket.close()
+                                    }
+                                } catch (e: Exception) {
+                                    clientSocket.close()
+                                }
+                            } ?: run {
+                                clientSocket.close()
+                            }
+                        }
+                    } catch (e: Exception) {
+                        continuation.resumeWithException(e)
+                    }
+                }.invokeOnCompletion {
+                    serverSocket.close()
+                }
         }
-        return TODO("there is inifinitive while")
     }
 }
 
