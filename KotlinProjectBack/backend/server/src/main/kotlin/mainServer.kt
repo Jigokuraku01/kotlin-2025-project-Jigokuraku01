@@ -16,7 +16,6 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.time.withTimeoutOrNull
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.net.Inet4Address
@@ -57,7 +56,7 @@ class MainServer<T : IGame.InfoForSending>(
         withContext(Dispatchers.IO) {
             val selector = ActorSelectorManager(Dispatchers.IO)
             try {
-                aSocket(selector).tcp().bind(InetSocketAddress(ip!!, port)).use {
+                aSocket(selector).tcp().bind(InetSocketAddress("0.0.0.0", port)).use {
                     true
                 }
             } catch (e: Exception) {
@@ -75,29 +74,14 @@ class MainServer<T : IGame.InfoForSending>(
         val job =
             customScope.launch {
                 startServer(port)
-                    .also {
-                        onStatusUpdate("🟢 Сервер запущен на $ip:$port")
-                    }.also { socket ->
+                    .also { socket ->
                         startCommunicate(socket)
                     }
             }
         job.join()
     }
 
-    @Serializable
-    data class ServerInfo(
-        val serverName: String,
-        val port: Int,
-    )
-
     suspend fun startCommunicate(curSocket: Socket) {
-        suspend fun checkConnection() =
-            try {
-                output?.writeStringUtf8("\n")
-                true
-            } catch (e: Exception) {
-                false
-            }
         var currentGameState = IGame.GameState.ONGOING
         customScope
             .launch {
@@ -138,8 +122,8 @@ class MainServer<T : IGame.InfoForSending>(
         }
         onStatusUpdate("🔵 Сервер начал ожидать запросы по $ip:$port")
         val selector = ActorSelectorManager(Dispatchers.IO)
-        val serverSocket = aSocket(selector).tcp().bind(InetSocketAddress(ip, port))
         var isServerStarted = false
+        val serverSocket = aSocket(selector).tcp().bind(InetSocketAddress(ip, port))
         return suspendCancellableCoroutine { continuation ->
             CoroutineScope(Dispatchers.IO + SupervisorJob())
                 .launch {
@@ -157,6 +141,7 @@ class MainServer<T : IGame.InfoForSending>(
                                         output = tmpOutput
                                         continuation.resume(clientSocket)
                                         isServerStarted = true
+                                        onStatusUpdate("🟢 Сервер запущен на $ip:$port")
                                         return@withTimeoutOrNull
                                     } else {
                                         tmpOutput.writeStringUtf8("ok\n")

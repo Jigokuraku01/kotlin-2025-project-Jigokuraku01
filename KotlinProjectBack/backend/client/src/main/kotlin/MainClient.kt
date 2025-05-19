@@ -14,7 +14,6 @@ import io.ktor.utils.io.writeStringUtf8
 import kotlinx.coroutines.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.net.NetworkInterface
@@ -44,13 +43,7 @@ open class MainClient<T : IGame.InfoForSending>(
         job.join()
     }
 
-    @Serializable
-    data class ServerInfo(
-        val serverName: String,
-        val port: Int,
-    )
-
-    open fun selectIpFromList(list: List<String>): String? {
+    open suspend fun selectIpFromList(list: List<String>): String? {
         list.forEach {
             println("Possible IP: $it")
         }
@@ -82,7 +75,8 @@ open class MainClient<T : IGame.InfoForSending>(
 
                                 val answer = tmpInput.readUTF8Line()
                                 if (answer != "ok") {
-                                    throw Exception("some problem")
+                                    onStatusUpdate("🔴 some network input problems 🔴")
+                                    throw Exception("error occurred")
                                 }
                                 val serverInfoSerializable = tmpInput.readUTF8Line() ?: throw Exception("input failure with ip $posIP")
                                 val serverInfo = Json.decodeFromString<ServerInfo>(serverInfoSerializable)
@@ -96,7 +90,7 @@ open class MainClient<T : IGame.InfoForSending>(
                             }
                         }
                     }.joinAll()
-                    .also { println("🔵 End Of Log of selecting network🔵") }
+                    .also { println("🔵 End Of Log of selecting network 🔵") }
             }
         job.join()
         println(listOfPossibeIP)
@@ -118,14 +112,6 @@ open class MainClient<T : IGame.InfoForSending>(
     }
 
     private suspend fun startCommunicate(curSocket: Socket) {
-        suspend fun checkConnection() =
-            try {
-                output?.writeStringUtf8("\n")
-                true
-            } catch (e: Exception) {
-                false
-            }
-
         var currentGameState = IGame.GameState.ONGOING
         customScope
             .launch {

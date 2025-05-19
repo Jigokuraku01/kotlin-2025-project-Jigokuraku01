@@ -11,7 +11,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeout
 import org.example.IGame
 import org.example.MainClient
 
@@ -21,27 +24,7 @@ class ClientComposable<T : IGame.InfoForSending>(
     private val activity: ComponentActivity,
     private val onStatusUpdate: (String) -> Unit = {},
 ) : MainClient<T>(currentGame, port, onStatusUpdate) {
-    private var selectedIp by mutableStateOf<String?>(null)
-    private var showDialog by mutableStateOf(false)
-
-    override fun selectIpFromList(list: List<String>): String? {
-        println(list)
-        if (list.size == 0) {
-            onStatusUpdate("🔵 No Servers found 🔵")
-            return null
-        }
-        activity.setContent {
-            IpSelectionDialog(
-                ipList = list,
-                onIpSelected = { ip ->
-                    selectedIp = ip
-                    showDialog = false
-                },
-                onDismiss = { showDialog = false },
-            )
-        }
-        return selectedIp
-    }
+    private var availableServers by mutableStateOf<List<String>>(emptyList())
 
     @Suppress("ktlint:standard:function-naming")
     @Composable
@@ -50,46 +33,76 @@ class ClientComposable<T : IGame.InfoForSending>(
         onIpSelected: (String) -> Unit,
         onDismiss: () -> Unit,
     ) {
-        if (showDialog) {
-            AlertDialog(
-                onDismissRequest = onDismiss,
-                title = { Text("Выберите сервер") },
-                text = {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(ipList) { ip ->
-                            ListItem(
-                                headlineContent = { Text(ip) },
-                                leadingContent = {
-                                    RadioButton(
-                                        selected = selectedIp == ip,
-                                        onClick = { onIpSelected(ip) },
-                                    )
-                                },
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .clickable { onIpSelected(ip) },
-                            )
-                            Divider()
-                        }
+        var selectedIp by remember { mutableStateOf<String?>(null) }
+
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Выберите сервер") },
+            text = {
+                LazyColumn(Modifier.fillMaxWidth()) {
+                    items(ipList) { ip ->
+                        ListItem(
+                            headlineContent = { Text(ip) },
+                            leadingContent = {
+                                RadioButton(
+                                    selected = selectedIp == ip,
+                                    onClick = { selectedIp = ip },
+                                )
+                            },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable { selectedIp = ip },
+                        )
+                        Divider()
                     }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            selectedIp?.let { onIpSelected(it) }
-                        },
-                        enabled = selectedIp != null,
-                    ) {
-                        Text("Подтвердить")
-                    }
-                },
-            )
-        } else {
-            showDialog = true
-        }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { selectedIp?.let(onIpSelected) },
+                    enabled = selectedIp != null,
+                ) {
+                    Text("Подтвердить")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) {
+                    Text("Отмена")
+                }
+            },
+        )
     }
+
+    override suspend fun selectIpFromList(list: List<String>): String? =
+        coroutineScope {
+            availableServers = list
+            if (list.isEmpty()) {
+                onStatusUpdate("🔵 No Servers found 🔵")
+                return@coroutineScope null
+            }
+
+            val selectionDeferred = CompletableDeferred<String?>()
+
+            activity.setContent {
+                IpSelectionDialog(
+                    ipList = availableServers,
+                    onIpSelected = { ip ->
+                        selectionDeferred.complete(ip)
+                    },
+                    onDismiss = {
+                        selectionDeferred.complete(null)
+                    },
+                )
+            }
+
+            try {
+                withTimeout(30_000) {
+                    selectionDeferred.await()
+                }
+            } catch (e: TimeoutCancellationException) {
+                onStatusUpdate("🟡 Время выбора сервера истекло")
+                null
+            }
+        }
 }
