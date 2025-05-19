@@ -73,9 +73,6 @@ open class MainClient<T : IGame.InfoForSending>(
                             try {
                                 onStatusUpdate("🔵 Пытаюсь подключиться к $posIP:$port")
                                 val selector = ActorSelectorManager(Dispatchers.IO)
-                                if (posIP == "10.0.2.15") {
-                                    println("aboba")
-                                }
                                 val socket =
                                     aSocket(selector).tcp().connect(InetSocketAddress(posIP, port)) {
                                     }
@@ -96,10 +93,10 @@ open class MainClient<T : IGame.InfoForSending>(
                                     "$posIP Exception handled ${e.message}",
                                 )
                                 e.stackTrace.forEach { println(it) }
-                                println("🔵 End Of Log 🔵")
                             }
                         }
                     }.joinAll()
+                    .also { println("🔵 End Of Log of selecting network🔵") }
             }
         job.join()
         println(listOfPossibeIP)

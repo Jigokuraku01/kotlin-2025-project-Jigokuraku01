@@ -26,6 +26,10 @@ class ClientComposable<T : IGame.InfoForSending>(
 
     override fun selectIpFromList(list: List<String>): String? {
         println(list)
+        if (list.size == 0) {
+            onStatusUpdate("🔵 No Servers found 🔵")
+            return null
+        }
         activity.setContent {
             IpSelectionDialog(
                 ipList = list,

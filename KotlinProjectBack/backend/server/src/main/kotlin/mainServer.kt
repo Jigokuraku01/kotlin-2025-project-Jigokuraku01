@@ -2,7 +2,10 @@
 
 package org.example
 import io.ktor.network.selector.*
+import io.ktor.network.selector.ActorSelectorManager
 import io.ktor.network.sockets.*
+import io.ktor.network.sockets.InetSocketAddress
+import io.ktor.network.sockets.aSocket
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.ByteWriteChannel
 import io.ktor.utils.io.cancel
@@ -10,13 +13,14 @@ import io.ktor.utils.io.close
 import io.ktor.utils.io.readUTF8Line
 import io.ktor.utils.io.writeStringUtf8
 import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.time.withTimeoutOrNull
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.net.Inet4Address
 import java.net.NetworkInterface
-import java.net.ServerSocket
 import java.util.Collections
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -49,14 +53,18 @@ class MainServer<T : IGame.InfoForSending>(
         return null
     }
 
-    fun isPortAvailable(port: Int): Boolean =
-        try {
-            ServerSocket(port).use {
-                it.reuseAddress = true
-                true
+    suspend fun isPortAvailable(port: Int): Boolean =
+        withContext(Dispatchers.IO) {
+            val selector = ActorSelectorManager(Dispatchers.IO)
+            try {
+                aSocket(selector).tcp().bind(InetSocketAddress(ip!!, port)).use {
+                    true
+                }
+            } catch (e: Exception) {
+                false
+            } finally {
+                selector.close()
             }
-        } catch (e: Exception) {
-            false
         }
 
     suspend fun startServer() {
@@ -128,7 +136,6 @@ class MainServer<T : IGame.InfoForSending>(
         if (ip == null) {
             throw Exception("IP finding problem")
         }
-
         onStatusUpdate("🔵 Сервер начал ожидать запросы по $ip:$port")
         val selector = ActorSelectorManager(Dispatchers.IO)
         val serverSocket = aSocket(selector).tcp().bind(InetSocketAddress(ip, port))
@@ -162,7 +169,7 @@ class MainServer<T : IGame.InfoForSending>(
                                             ) + "\n",
                                         )
                                         if (!isServerStarted) {
-                                            tmpOutput.close()
+                                            tmpOutput.flushAndClose()
                                             tmpInput.cancel()
                                             clientSocket.close()
                                         }

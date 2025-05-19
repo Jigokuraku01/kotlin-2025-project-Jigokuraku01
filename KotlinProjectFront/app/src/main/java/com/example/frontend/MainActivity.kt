@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun serverClientApp() {
         var mode by remember { mutableStateOf("client") }
-        var port by remember { mutableStateOf("8001") }
+        var port by remember { mutableStateOf("8002") }
         var game by remember { mutableStateOf("TicTacToe") }
         var status by remember { mutableStateOf("Не подключено") }
         var isConnected by remember { mutableStateOf(false) }
@@ -130,6 +130,7 @@ class MainActivity : ComponentActivity() {
                                             port.toInt(),
                                             onStatusUpdate = { newStatus ->
                                                 status = newStatus
+                                                println(newStatus)
                                             },
                                         ).startServer()
                                         isConnected = true
@@ -145,6 +146,7 @@ class MainActivity : ComponentActivity() {
                                         this@MainActivity,
                                         onStatusUpdate = { newStatus ->
                                             status = newStatus
+                                            println(newStatus)
                                         },
                                     ).startClient()
                                     isConnected = true
