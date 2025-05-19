@@ -27,11 +27,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import org.example.MainClient
-import org.example.StartServer
+import org.example.MainServer
 
 class MainActivity : ComponentActivity() {
+    val customScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val job = SupervisorJob()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -47,11 +52,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        job.cancel()
+    }
+
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun serverClientApp() {
         var mode by remember { mutableStateOf("client") }
-        var port by remember { mutableStateOf("8080") }
+        var port by remember { mutableStateOf("8001") }
         var game by remember { mutableStateOf("TicTacToe") }
         var status by remember { mutableStateOf("Не подключено") }
         var isConnected by remember { mutableStateOf(false) }
@@ -110,25 +120,37 @@ class MainActivity : ComponentActivity() {
 
             Button(
                 onClick = {
-                    isConnected = true
-                    status =
-                        if (mode == "server") {
-                            lifecycleScope.launch {
-                                StartServer(
-                                    TicTacToeComposable(this@MainActivity),
-                                    port.toInt(),
-                                ).startServer()
+                    if (mode == "server") {
+                        lifecycleScope
+                            .launch(Dispatchers.IO) {
+                                customScope
+                                    .launch {
+                                        MainServer(
+                                            TicTacToeComposable(this@MainActivity),
+                                            port.toInt(),
+                                            onStatusUpdate = { newStatus ->
+                                                status = newStatus
+                                            },
+                                        ).startServer()
+                                        isConnected = true
+                                    }.join()
                             }
-                            "Сервер запущен на порту $port"
-                        } else {
-                            lifecycleScope.launch {
-                                MainClient(
-                                    TicTacToeComposable(this@MainActivity),
-                                    port.toInt(),
-                                ).startClient()
-                            }
-                            "Подключено к серверу на порту $port"
+                    } else {
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            customScope
+                                .launch {
+                                    ClientComposable(
+                                        TicTacToeComposable(this@MainActivity),
+                                        port.toInt(),
+                                        this@MainActivity,
+                                        onStatusUpdate = { newStatus ->
+                                            status = newStatus
+                                        },
+                                    ).startClient()
+                                    isConnected = true
+                                }.join()
                         }
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {

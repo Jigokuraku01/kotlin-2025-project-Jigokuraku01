@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import org.example.TicTacToeGame
 
 class TicTacToeComposable(
@@ -52,17 +53,15 @@ class TicTacToeComposable(
         }
     }
 
-    override fun returnClassWithCorrectInput(playerId: String): GameMove {
+    override suspend fun returnClassWithCorrectInput(playerId: String): GameMove {
         activity.runOnUiThread {
             currentPlayerId = playerId
             showInputDialog = true
             inputResult = null
         }
-
         while (inputResult == null) {
-            Thread.sleep(100)
+            delay(100)
         }
-
         return inputResult!!
     }
 

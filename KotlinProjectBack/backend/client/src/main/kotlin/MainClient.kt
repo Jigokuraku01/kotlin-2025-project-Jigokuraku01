@@ -20,16 +20,16 @@ import kotlinx.serialization.json.Json
 import java.net.NetworkInterface
 import java.net.SocketException
 
-class MainClient<T : IGame.InfoForSending>(
+open class MainClient<T : IGame.InfoForSending>(
     private val currentGame: IGame<T>,
     private val port: Int,
+    private val onStatusUpdate: (String) -> Unit = {},
 ) {
     var input: ByteReadChannel? = null
     var output: ByteWriteChannel? = null
     val customScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     suspend fun startClient() {
-        val customScope = CoroutineScope(Dispatchers.IO)
         val job =
             customScope.launch {
                 val ip = selectGoodServer()
@@ -50,6 +50,18 @@ class MainClient<T : IGame.InfoForSending>(
         val port: Int,
     )
 
+    open fun selectIpFromList(list: List<String>): String? {
+        list.forEach {
+            println("Possible IP: $it")
+        }
+        print("Введите нужный IP: ")
+        val ansIP = readLine()?.trim()
+        if (!list.contains(ansIP)) {
+            throw InvalidPhaseException("invalid ip")
+        }
+        return ansIP
+    }
+
     suspend fun selectGoodServer(): String? {
         val listOfPossibeIP = mutableListOf<String>()
         val x = scanNetwork()
@@ -59,10 +71,13 @@ class MainClient<T : IGame.InfoForSending>(
                     .map { posIP ->
                         launch {
                             try {
+                                onStatusUpdate("🔵 Пытаюсь подключиться к $posIP:$port")
                                 val selector = ActorSelectorManager(Dispatchers.IO)
+                                if (posIP == "10.0.2.15") {
+                                    println("aboba")
+                                }
                                 val socket =
                                     aSocket(selector).tcp().connect(InetSocketAddress(posIP, port)) {
-                                        socketTimeout = 5000
                                     }
                                 val tmpOutput = socket.openWriteChannel(autoFlush = true)
                                 tmpOutput.writeStringUtf8("took-took\n")
@@ -77,20 +92,18 @@ class MainClient<T : IGame.InfoForSending>(
                                 listOfPossibeIP.add(serverInfo.serverName)
                                 socket.close()
                             } catch (e: Exception) {
+                                println(
+                                    "$posIP Exception handled ${e.message}",
+                                )
+                                e.stackTrace.forEach { println(it) }
+                                println("🔵 End Of Log 🔵")
                             }
                         }
                     }.joinAll()
             }
         job.join()
-        listOfPossibeIP.forEach {
-            println("Possible IP: $it")
-        }
-        print("Введите нужный IP: ")
-        val ansIP = readLine()
-        if (!listOfPossibeIP.contains(ansIP)) {
-            throw InvalidPhaseException("invalid ip")
-        }
-        return ansIP
+        println(listOfPossibeIP)
+        return selectIpFromList(listOfPossibeIP)
     }
 
     fun scanNetwork(): List<String> {
@@ -125,6 +138,7 @@ class MainClient<T : IGame.InfoForSending>(
                             input?.readUTF8Line() ?: throw SocketException("Server connection error")
                         } catch (e: Exception) {
                             println("Connection error: ${e.message} $input")
+                            onStatusUpdate("🔴 Connection error: ${e.message}")
                             break
                         }
                     if (clientJSon.startsWith("Game Over:")) {
@@ -163,18 +177,19 @@ class MainClient<T : IGame.InfoForSending>(
     ): Socket? {
         val selector = ActorSelectorManager(Dispatchers.IO)
         return try {
+            onStatusUpdate("🔵 Пытаюсь подключиться к $ip:$port")
             aSocket(selector)
                 .tcp()
                 .connect(
                     InetSocketAddress(ip, port),
                 ).also {
-                    println("Успешное подключение к $ip:$port")
+                    onStatusUpdate("\uD83D\uDFE2 Успешное подключение к $ip:$port")
                     output = it.openWriteChannel(autoFlush = true)
                     output?.writeStringUtf8("connection\n")
                     input = it.openReadChannel()
                 }
         } catch (e: Exception) {
-            println("Ошибка подключения: ${e.message}")
+            onStatusUpdate("🔴 Connection error: ${e.message}")
             selector.close()
             null
         }

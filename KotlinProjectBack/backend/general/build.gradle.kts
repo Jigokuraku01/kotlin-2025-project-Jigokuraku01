@@ -12,9 +12,10 @@ repositories {
 
 dependencies {
     testImplementation(kotlin("test"))
+    implementation("io.ktor:ktor-client-cio:3.1.3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
-    implementation("io.ktor:ktor-network:2.3.7")
-    implementation("io.ktor:ktor-network-tls:2.3.7")
+    implementation("io.ktor:ktor-network:3.1.3")
+    implementation("io.ktor:ktor-network-tls:3.1.3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
     implementation("org.jetbrains.kotlin:kotlin-reflect:1.9.0")
 }

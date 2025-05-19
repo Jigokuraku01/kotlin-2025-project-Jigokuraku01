@@ -16,6 +16,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.net.Inet4Address
 import java.net.NetworkInterface
+import java.net.ServerSocket
 import java.util.Collections
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -24,6 +25,7 @@ import kotlin.io.println
 class MainServer<T : IGame.InfoForSending>(
     private val currentGame: IGame<T>,
     private val port: Int,
+    private val onStatusUpdate: (String) -> Unit = {},
 ) {
     var input: ByteReadChannel? = null
     var output: ByteWriteChannel? = null
@@ -47,15 +49,30 @@ class MainServer<T : IGame.InfoForSending>(
         return null
     }
 
+    fun isPortAvailable(port: Int): Boolean =
+        try {
+            ServerSocket(port).use {
+                it.reuseAddress = true
+                true
+            }
+        } catch (e: Exception) {
+            false
+        }
+
     suspend fun startServer() {
-        val customScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        if (!isPortAvailable(port)) {
+            onStatusUpdate("🔴 Port $port is not available")
+            return
+        }
         val job =
             customScope.launch {
-                startServer(port).also { socket ->
-                    startCommunicate(socket)
-                }
+                startServer(port)
+                    .also {
+                        onStatusUpdate("🟢 Сервер запущен на $ip:$port")
+                    }.also { socket ->
+                        startCommunicate(socket)
+                    }
             }
-
         job.join()
     }
 
@@ -112,6 +129,7 @@ class MainServer<T : IGame.InfoForSending>(
             throw Exception("IP finding problem")
         }
 
+        onStatusUpdate("🔵 Сервер начал ожидать запросы по $ip:$port")
         val selector = ActorSelectorManager(Dispatchers.IO)
         val serverSocket = aSocket(selector).tcp().bind(InetSocketAddress(ip, port))
         var isServerStarted = false

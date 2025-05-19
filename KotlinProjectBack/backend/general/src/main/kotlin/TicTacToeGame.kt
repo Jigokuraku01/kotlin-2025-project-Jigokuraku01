@@ -32,7 +32,7 @@ open class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
         throw IllegalArgumentException("invalid player id")
     }
 
-    override fun returnClassWithCorrectInput(playerId: String): GameMove {
+    override suspend fun returnClassWithCorrectInput(playerId: String): GameMove {
         print("Вы играете за ${getPlayerId(playerId)}. Что бы вы хотели сделать?(ходить, сдаться): ")
         val action = readln()
         if (!(action == "ходить" || action == "сдаться")) {
