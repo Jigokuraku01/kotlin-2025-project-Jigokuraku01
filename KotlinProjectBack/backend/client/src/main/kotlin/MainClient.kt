@@ -8,7 +8,6 @@ import io.ktor.network.sockets.aSocket
 import io.ktor.util.pipeline.InvalidPhaseException
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.ByteWriteChannel
-import io.ktor.utils.io.cancel
 import io.ktor.utils.io.close
 import io.ktor.utils.io.readUTF8Line
 import io.ktor.utils.io.writeStringUtf8
@@ -33,11 +32,12 @@ class MainClient<T : IGame.InfoForSending>(
         val customScope = CoroutineScope(Dispatchers.IO)
         val job =
             customScope.launch {
-                val ip = "26.163.86.226" // selectGoodServer()
-
-                startClient(port, ip).also { socket ->
-                    if (socket != null) {
-                        startCommunicate(socket)
+                val ip = selectGoodServer()
+                if (ip != null) {
+                    startClient(port, ip).also { socket ->
+                        if (socket != null) {
+                            startCommunicate(socket)
+                        }
                     }
                 }
             }
@@ -50,7 +50,7 @@ class MainClient<T : IGame.InfoForSending>(
         val port: Int,
     )
 
-    suspend fun selectGoodServer(): String {
+    suspend fun selectGoodServer(): String? {
         val listOfPossibeIP = mutableListOf<String>()
         val x = scanNetwork()
         val job =
@@ -86,11 +86,11 @@ class MainClient<T : IGame.InfoForSending>(
             println("Possible IP: $it")
         }
         print("Введите нужный IP: ")
-        val ansIP = readln()
+        val ansIP = readLine()
         if (!listOfPossibeIP.contains(ansIP)) {
             throw InvalidPhaseException("invalid ip")
         }
-        return readln()
+        return ansIP
     }
 
     fun scanNetwork(): List<String> {
@@ -107,10 +107,10 @@ class MainClient<T : IGame.InfoForSending>(
         return addresses
     }
 
-    suspend fun startCommunicate(curSocket: Socket) {
+    private suspend fun startCommunicate(curSocket: Socket) {
         suspend fun checkConnection() =
             try {
-                output?.writeStringUtf8("\u0001")
+                output?.writeStringUtf8("\n")
                 true
             } catch (e: Exception) {
                 false
@@ -119,28 +119,12 @@ class MainClient<T : IGame.InfoForSending>(
         var currentGameState = IGame.GameState.ONGOING
         customScope
             .launch {
-                val checkingDelayJob =
-                    launch {
-                        while (true) {
-                            delay(5000)
-                            if (!checkConnection()) {
-                                println("Connection lost!")
-                                curSocket.close()
-                                break
-                            }
-                        }
-                    }
-
                 while (currentGameState == IGame.GameState.ONGOING) {
                     val clientJSon =
                         try {
-                            var str = ""
-                            withTimeoutOrNull(20000) {
-                                str = input?.readUTF8Line() ?: throw SocketException("Server disconnected")
-                            } ?: throw Exception("Server disconnected")
-                            str
+                            input?.readUTF8Line() ?: throw SocketException("Server connection error")
                         } catch (e: Exception) {
-                            println("Connection error: ${e.message}")
+                            println("Connection error: ${e.message} $input")
                             break
                         }
                     if (clientJSon.startsWith("Game Over:")) {
@@ -155,7 +139,7 @@ class MainClient<T : IGame.InfoForSending>(
                     }
 
                     if (currentGameState != IGame.GameState.ONGOING) {
-                        output?.writeStringUtf8("Game Over: ${currentGameState.name}")
+                        output?.writeStringUtf8("Game Over: ${currentGameState.name}\n")
                         break
                     }
 
@@ -163,7 +147,6 @@ class MainClient<T : IGame.InfoForSending>(
                     output?.writeStringUtf8(Json.encodeToString(clentMove) + "\n")
                     currentGameState = currentGame.makeMove(clentMove)
                 }
-                checkingDelayJob.cancel()
             }.join()
 
         when (currentGameState) {
@@ -184,9 +167,7 @@ class MainClient<T : IGame.InfoForSending>(
                 .tcp()
                 .connect(
                     InetSocketAddress(ip, port),
-                ) {
-                    socketTimeout = 3000
-                }.also {
+                ).also {
                     println("Успешное подключение к $ip:$port")
                     output = it.openWriteChannel(autoFlush = true)
                     output?.writeStringUtf8("connection\n")

@@ -28,6 +28,7 @@ class MainServer<T : IGame.InfoForSending>(
     var input: ByteReadChannel? = null
     var output: ByteWriteChannel? = null
     private val ip = getLocalIpAddress()
+    val customScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun getLocalIpAddress(): String? {
         try {
@@ -64,51 +65,39 @@ class MainServer<T : IGame.InfoForSending>(
         val port: Int,
     )
 
-    fun startCommunicate(curSocket: Socket) {
+    suspend fun startCommunicate(curSocket: Socket) {
         suspend fun checkConnection() =
             try {
-                output?.writeStringUtf8("\u0001")
+                output?.writeStringUtf8("\n")
                 true
             } catch (e: Exception) {
                 false
             }
         var currentGameState = IGame.GameState.ONGOING
-        runBlocking {
-            val checkingDelayJob =
-                launch {
-                    while (true) {
-                        delay(5000)
-                        if (!checkConnection()) {
-                            println("Connection lost!")
-                            curSocket.close()
-                            break
-                        }
+        customScope
+            .launch {
+                while (currentGameState == IGame.GameState.ONGOING) {
+                    val serverMove = currentGame.returnClassWithCorrectInput("server")
+                    output?.writeStringUtf8(Json.encodeToString(serverMove) + "\n")
+                    currentGameState = currentGame.makeMove(serverMove)
+                    if (currentGameState != IGame.GameState.ONGOING) {
+                        output?.writeStringUtf8("Game Over: ${currentGameState.name}\n")
+                        break
+                    }
+
+                    val clientJSon = input?.readUTF8Line() ?: break
+                    if (clientJSon.startsWith("Game Over:")) {
+                        break
+                    }
+                    try {
+                        println("Earned move from other player")
+                        val clientMove = currentGame.decerializeJsonFromStringToInfoSending(clientJSon)
+                        currentGameState = currentGame.makeMove(clientMove)
+                    } catch (e: Exception) {
+                        println("Json parsing error ${e.message}")
                     }
                 }
-
-            while (currentGameState == IGame.GameState.ONGOING) {
-                val serverMove = currentGame.returnClassWithCorrectInput("server")
-                output?.writeStringUtf8(Json.encodeToString(serverMove) + "\n")
-                currentGameState = currentGame.makeMove(serverMove)
-                if (currentGameState != IGame.GameState.ONGOING) {
-                    output?.writeStringUtf8("Game Over: ${currentGameState.name}")
-                    break
-                }
-
-                val clientJSon = input?.readUTF8Line() ?: break
-                if (clientJSon.startsWith("Game Over:")) {
-                    break
-                }
-                try {
-                    println("Earned move from other player")
-                    val clientMove = currentGame.decerializeJsonFromStringToInfoSending(clientJSon)
-                    currentGameState = currentGame.makeMove(clientMove)
-                } catch (e: Exception) {
-                    println("Json parsing error ${e.message}")
-                }
-            }
-            checkingDelayJob.cancel()
-        }
+            }.join()
 
         when (currentGameState) {
             IGame.GameState.DRAW -> println("Draw")
@@ -125,7 +114,7 @@ class MainServer<T : IGame.InfoForSending>(
 
         val selector = ActorSelectorManager(Dispatchers.IO)
         val serverSocket = aSocket(selector).tcp().bind(InetSocketAddress(ip, port))
-
+        var isServerStarted = false
         return suspendCancellableCoroutine { continuation ->
             CoroutineScope(Dispatchers.IO + SupervisorJob())
                 .launch {
@@ -134,16 +123,19 @@ class MainServer<T : IGame.InfoForSending>(
                             val clientSocket = serverSocket.accept()
                             withTimeoutOrNull(5000) {
                                 try {
-                                    val input = clientSocket.openReadChannel()
-                                    val output = clientSocket.openWriteChannel(autoFlush = true)
+                                    val tmpInput = clientSocket.openReadChannel()
+                                    val tmpOutput = clientSocket.openWriteChannel(autoFlush = true)
 
-                                    val message = input.readUTF8Line() ?: throw Exception("input failure")
+                                    val message = tmpInput.readUTF8Line() ?: throw Exception("input failure")
                                     if (message == "connection") {
+                                        input = tmpInput
+                                        output = tmpOutput
                                         continuation.resume(clientSocket)
+                                        isServerStarted = true
                                         return@withTimeoutOrNull
                                     } else {
-                                        output.writeStringUtf8("ok\n")
-                                        output.writeStringUtf8(
+                                        tmpOutput.writeStringUtf8("ok\n")
+                                        tmpOutput.writeStringUtf8(
                                             Json.encodeToString(
                                                 ServerInfo(
                                                     serverName = ip,
@@ -151,24 +143,31 @@ class MainServer<T : IGame.InfoForSending>(
                                                 ),
                                             ) + "\n",
                                         )
-
-                                        output.close()
-                                        input.cancel()
-                                        clientSocket.close()
+                                        if (!isServerStarted) {
+                                            tmpOutput.close()
+                                            tmpInput.cancel()
+                                            clientSocket.close()
+                                        }
                                     }
                                 } catch (e: Exception) {
-                                    clientSocket.close()
+                                    if (!isServerStarted) {
+                                        clientSocket.close()
+                                    }
                                     throw e
                                 }
                             } ?: run {
-                                clientSocket.close()
+                                if (!isServerStarted) {
+                                    clientSocket.close()
+                                }
                             }
                         }
                     } catch (e: Exception) {
                         continuation.resumeWithException(e)
                     }
                 }.invokeOnCompletion {
-                    serverSocket.close()
+                    if (!isServerStarted) {
+                        serverSocket.close()
+                    }
                 }
         }
     }
