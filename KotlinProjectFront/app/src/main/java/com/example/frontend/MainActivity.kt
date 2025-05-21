@@ -129,7 +129,7 @@ class MainActivity : ComponentActivity() {
                                             TicTacToeComposable(this@MainActivity),
                                             port.toInt(),
                                             onStatusUpdate = { newStatus ->
-                                                status = newStatus
+                                                status = "--------SERVER--------\n" + newStatus
                                                 println(newStatus)
                                             },
                                         ).startServer()
@@ -145,7 +145,7 @@ class MainActivity : ComponentActivity() {
                                         port.toInt(),
                                         this@MainActivity,
                                         onStatusUpdate = { newStatus ->
-                                            status = newStatus
+                                            status = "--------CLIENT--------\n" + newStatus
                                             println(newStatus)
                                         },
                                     ).startClient()

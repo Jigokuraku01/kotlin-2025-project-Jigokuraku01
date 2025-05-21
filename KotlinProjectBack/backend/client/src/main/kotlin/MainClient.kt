@@ -86,7 +86,7 @@ open class MainClient<T : IGame.InfoForSending>(
                                 println(
                                     "$posIP Exception handled ${e.message}",
                                 )
-                                e.stackTrace.forEach { println(it) }
+                                e.printStackTrace()
                             }
                         }
                     }.joinAll()
