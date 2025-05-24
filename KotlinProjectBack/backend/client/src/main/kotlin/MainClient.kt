@@ -2,21 +2,19 @@
 
 package org.example
 import io.ktor.network.selector.ActorSelectorManager
-import io.ktor.network.sockets.*
-import io.ktor.network.sockets.Socket
-import io.ktor.network.sockets.aSocket
 import io.ktor.util.pipeline.InvalidPhaseException
-import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.ByteWriteChannel
 import io.ktor.utils.io.close
-import io.ktor.utils.io.readUTF8Line
-import io.ktor.utils.io.writeStringUtf8
 import kotlinx.coroutines.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.PrintWriter
+import java.net.InetSocketAddress
 import java.net.NetworkInterface
+import java.net.Socket
 import java.net.SocketException
 
 open class MainClient<T : IGame.InfoForSending>(
@@ -24,8 +22,8 @@ open class MainClient<T : IGame.InfoForSending>(
     private val port: Int,
     private val onStatusUpdate: (String) -> Unit = {},
 ) {
-    var input: ByteReadChannel? = null
-    var output: ByteWriteChannel? = null
+    var input: BufferedReader? = null
+    var output: PrintWriter? = null
     val customScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     suspend fun startClient() {
@@ -35,7 +33,7 @@ open class MainClient<T : IGame.InfoForSending>(
                 if (ip != null) {
                     startClient(port, ip).also { socket ->
                         if (socket != null) {
-                            startCommunicate(socket)
+                            startCommunicate()
                         }
                     }
                 }
@@ -55,7 +53,7 @@ open class MainClient<T : IGame.InfoForSending>(
         return ansIP
     }
 
-    suspend fun selectGoodServer(): String? {
+    private suspend fun selectGoodServer(): String? {
         val listOfPossibeIP = mutableListOf<String>()
         val x = scanNetwork()
         val job =
@@ -66,25 +64,26 @@ open class MainClient<T : IGame.InfoForSending>(
                             try {
                                 onStatusUpdate("🔵 Пытаюсь подключиться к $posIP:$port")
                                 val selector = ActorSelectorManager(Dispatchers.IO)
-                                val socket =
-                                    aSocket(selector).tcp().connect(InetSocketAddress(posIP, port)) {
-                                    }
-                                val tmpOutput = socket.openWriteChannel(autoFlush = true)
-                                tmpOutput.writeStringUtf8("took-took\n")
-                                val tmpInput = socket.openReadChannel()
+                                val socket = Socket()
+                                socket.connect(InetSocketAddress(posIP, port), 300)
+                                val tmpOutput = PrintWriter(socket.getOutputStream(), true)
+                                tmpOutput.println("took-took")
+                                val tmpInput = BufferedReader(InputStreamReader(socket.getInputStream()))
 
-                                val answer = tmpInput.readUTF8Line()
+                                val answer = tmpInput.readLine()
                                 if (answer != "ok") {
                                     onStatusUpdate("🔴 some network input problems 🔴")
                                     throw Exception("error occurred")
                                 }
-                                val serverInfoSerializable = tmpInput.readUTF8Line() ?: throw Exception("input failure with ip $posIP")
+                                val serverInfoSerializable =
+                                    tmpInput.readLine() ?: throw Exception("input failure with ip $posIP")
                                 val serverInfo = Json.decodeFromString<ServerInfo>(serverInfoSerializable)
                                 listOfPossibeIP.add(serverInfo.serverName)
                                 socket.close()
                             } catch (e: Exception) {
                                 println(
-                                    "$posIP Exception handled ${e.message}",
+                                    "$posIP Exception handled ${e.message}\n" +
+                                        "-------STACK TRACE-------",
                                 )
                                 e.printStackTrace()
                             }
@@ -94,10 +93,10 @@ open class MainClient<T : IGame.InfoForSending>(
             }
         job.join()
         println(listOfPossibeIP)
-        return selectIpFromList(listOfPossibeIP)
+        return selectIpFromList(listOfPossibeIP.distinct())
     }
 
-    fun scanNetwork(): List<String> {
+    private fun scanNetwork(): List<String> {
         val addresses = mutableListOf<String>()
 
         NetworkInterface.getNetworkInterfaces()?.toList()?.forEach { networkInterface ->
@@ -111,14 +110,14 @@ open class MainClient<T : IGame.InfoForSending>(
         return addresses
     }
 
-    private suspend fun startCommunicate(curSocket: Socket) {
+    private suspend fun startCommunicate() {
         var currentGameState = IGame.GameState.ONGOING
         customScope
             .launch {
                 while (currentGameState == IGame.GameState.ONGOING) {
                     val clientJSon =
                         try {
-                            input?.readUTF8Line() ?: throw SocketException("Server connection error")
+                            input?.readLine() ?: throw SocketException("Server connection error")
                         } catch (e: Exception) {
                             println("Connection error: ${e.message} $input")
                             onStatusUpdate("🔴 Connection error: ${e.message}")
@@ -136,12 +135,12 @@ open class MainClient<T : IGame.InfoForSending>(
                     }
 
                     if (currentGameState != IGame.GameState.ONGOING) {
-                        output?.writeStringUtf8("Game Over: ${currentGameState.name}\n")
+                        output?.println("Game Over: ${currentGameState.name}")
                         break
                     }
 
                     val clentMove = currentGame.returnClassWithCorrectInput("client")
-                    output?.writeStringUtf8(Json.encodeToString(clentMove) + "\n")
+                    output?.println(Json.encodeToString(clentMove))
                     currentGameState = currentGame.makeMove(clentMove)
                 }
             }.join()
@@ -157,26 +156,20 @@ open class MainClient<T : IGame.InfoForSending>(
     private suspend fun startClient(
         port: Int,
         ip: String,
-    ): Socket? {
-        val selector = ActorSelectorManager(Dispatchers.IO)
-        return try {
+    ): Socket? =
+        try {
             onStatusUpdate("🔵 Пытаюсь подключиться к $ip:$port")
-            aSocket(selector)
-                .tcp()
-                .connect(
-                    InetSocketAddress(ip, port),
-                ).also {
-                    onStatusUpdate("\uD83D\uDFE2 Успешное подключение к $ip:$port")
-                    output = it.openWriteChannel(autoFlush = true)
-                    output?.writeStringUtf8("connection\n")
-                    input = it.openReadChannel()
-                }
+            Socket(ip, port).also {
+                onStatusUpdate("\uD83D\uDFE2 Успешное подключение к $ip:$port")
+                output = PrintWriter(it.getOutputStream(), true)
+                output?.println("connection")
+                input = BufferedReader(InputStreamReader(it.getInputStream()))
+            }
         } catch (e: Exception) {
             onStatusUpdate("🔴 Connection error: ${e.message}")
-            selector.close()
+            println(e.message)
             null
         }
-    }
 }
 
 fun main() {
@@ -184,7 +177,7 @@ fun main() {
         print("Введите порт для подключения: ")
         val port = readln().toInt()
         runBlocking {
-            MainClient(TicTacToeGame(), port).startClient()
+            MainClient(TicTacToeGame(), port) { a -> println(a) }.startClient()
         }
     } catch (e: Exception) {
         println("Exception handled: ${e.message}")

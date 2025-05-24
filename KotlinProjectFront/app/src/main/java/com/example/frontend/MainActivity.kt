@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun serverClientApp() {
         var mode by remember { mutableStateOf("client") }
-        var port by remember { mutableStateOf("8002") }
+        var port by remember { mutableStateOf("8080") }
         var game by remember { mutableStateOf("TicTacToe") }
         var status by remember { mutableStateOf("Не подключено") }
         var isConnected by remember { mutableStateOf(false) }
