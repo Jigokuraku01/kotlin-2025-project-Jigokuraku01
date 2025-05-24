@@ -1,29 +1,31 @@
 @file:Suppress("ktlint:standard:filename", "ktlint:standard:no-wildcard-imports")
 
 package org.example
-import io.ktor.network.selector.*
 import io.ktor.network.selector.ActorSelectorManager
-import io.ktor.network.sockets.*
 import io.ktor.network.sockets.InetSocketAddress
+import io.ktor.network.sockets.Socket
 import io.ktor.network.sockets.aSocket
+import io.ktor.network.sockets.openReadChannel
+import io.ktor.network.sockets.openWriteChannel
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.ByteWriteChannel
 import io.ktor.utils.io.cancel
-import io.ktor.utils.io.close
 import io.ktor.utils.io.readUTF8Line
 import io.ktor.utils.io.writeStringUtf8
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.time.withTimeoutOrNull
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.Collections
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import kotlin.io.println
 
 class MainServer<T : IGame.InfoForSending>(
     private val currentGame: IGame<T>,
@@ -32,8 +34,22 @@ class MainServer<T : IGame.InfoForSending>(
 ) {
     var input: ByteReadChannel? = null
     var output: ByteWriteChannel? = null
-    private val ip = getLocalIpAddress()
+    private val ip = getLocalIpAddress() ?: "0.0.0.0"
     val customScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    suspend fun isPortAvailable(port: Int): Boolean =
+        withContext(Dispatchers.IO) {
+            val selector = ActorSelectorManager(Dispatchers.IO)
+            try {
+                aSocket(selector).tcp().bind(InetSocketAddress("0.0.0.0", port)).use {
+                    true
+                }
+            } catch (e: Exception) {
+                false
+            } finally {
+                selector.close()
+            }
+        }
 
     fun getLocalIpAddress(): String? {
         try {
@@ -51,20 +67,6 @@ class MainServer<T : IGame.InfoForSending>(
         }
         return null
     }
-
-    suspend fun isPortAvailable(port: Int): Boolean =
-        withContext(Dispatchers.IO) {
-            val selector = ActorSelectorManager(Dispatchers.IO)
-            try {
-                aSocket(selector).tcp().bind(InetSocketAddress("0.0.0.0", port)).use {
-                    true
-                }
-            } catch (e: Exception) {
-                false
-            } finally {
-                selector.close()
-            }
-        }
 
     suspend fun startServer() {
         if (!isPortAvailable(port)) {
