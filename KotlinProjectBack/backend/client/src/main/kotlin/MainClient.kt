@@ -20,6 +20,7 @@ open class MainClient<T : IGame.InfoForSending>(
     private val currentGame: IGame<T>,
     private val port: Int,
     private val onStatusUpdate: (String) -> Unit = {},
+    private val setGameResult: (IGame.GameState) -> Unit = {},
 ) {
     var input: BufferedReader? = null
     var output: PrintWriter? = null
@@ -142,10 +143,10 @@ open class MainClient<T : IGame.InfoForSending>(
             }.join()
 
         when (currentGameState) {
-            IGame.GameState.DRAW -> println("Draw")
-            IGame.GameState.SERVER_WINS -> println("Server Wins")
-            IGame.GameState.CLIENT_WINS -> println("Client Wins")
-            else -> println("Incorrect state or other player disconnected")
+            IGame.GameState.DRAW -> setGameResult(IGame.GameState.DRAW)
+            IGame.GameState.SERVER_WINS -> setGameResult(IGame.GameState.SERVER_WINS)
+            IGame.GameState.CLIENT_WINS -> setGameResult(IGame.GameState.CLIENT_WINS)
+            else -> onStatusUpdate("Incorrect state or other player disconnected")
         }
     }
 

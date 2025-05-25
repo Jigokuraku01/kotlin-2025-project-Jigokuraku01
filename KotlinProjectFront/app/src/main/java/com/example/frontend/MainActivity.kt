@@ -138,6 +138,9 @@ class MainActivity : ComponentActivity() {
                                                 status = newStatus
                                                 println("--------SERVER--------\n" + newStatus)
                                             },
+                                            setGameResult = { newGameResult ->
+                                                ticTacToeGame.gameResult = newGameResult
+                                            },
                                         )
                                     server.startServer()
                                     isConnected = true
@@ -155,6 +158,9 @@ class MainActivity : ComponentActivity() {
                                             onStatusUpdate = { newStatus ->
                                                 status = newStatus
                                                 println("--------CLIENT--------\n" + newStatus)
+                                            },
+                                            setGameResult = { newGameResult ->
+                                                ticTacToeGame.gameResult = newGameResult
                                             },
                                         )
 

@@ -23,7 +23,8 @@ class ClientComposable<T : IGame.InfoForSending>(
     private val port: Int,
     private val activity: ComponentActivity,
     private val onStatusUpdate: (String) -> Unit = {},
-) : MainClient<T>(currentGame, port, onStatusUpdate) {
+    private val setGameResult: (IGame.GameState) -> Unit = {},
+) : MainClient<T>(currentGame, port, onStatusUpdate, setGameResult) {
     private var availableServers by mutableStateOf<List<String>>(emptyList())
 
     @Suppress("ktlint:standard:function-naming")

@@ -43,6 +43,8 @@ class TicTacToeComposable(
     private var currentPlayerId by mutableStateOf("")
     private var alreadyRendered = false
     private var fieldState by mutableStateOf(Array(3) { arrayOfNulls<String>(3) })
+    public var gameResult: IGame.GameState? by mutableStateOf(null)
+    private var gameResultString: String? by mutableStateOf(null)
 
     private fun updateFieldState() {
         val newField =
@@ -56,7 +58,15 @@ class TicTacToeComposable(
 
     override fun makeMove(move: IGame.InfoForSending): GameState {
         val state = super.makeMove(move)
+        gameResult = state
         updateFieldState()
+        when (state) {
+            GameState.CLIENT_WINS -> gameResultString = "Победа клиента 🎉"
+            GameState.SERVER_WINS -> gameResultString = "Победа сервера 🏆"
+            GameState.DRAW -> gameResultString = "Ничья 🤝"
+            else -> {}
+        }
+
         return state
     }
 
@@ -75,6 +85,18 @@ class TicTacToeComposable(
     @Suppress("ktlint:standard:function-naming")
     @Composable
     fun GameScreen() {
+        if (gameResultString != null) {
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text("Игра завершена") },
+                text = { Text(gameResultString!!) },
+                confirmButton = {
+                    Button(onClick = { gameResultString = null }) {
+                        Text("Ок")
+                    }
+                },
+            )
+        }
         Column {
             printFieldComposable()
             if (showInputDialog) {
@@ -170,8 +192,8 @@ class TicTacToeComposable(
                             GameMove(
                                 action = action,
                                 playerId = getPlayerId(playerId),
-                                x = if (action == "ходить") x.toInt() else -1,
-                                y = if (action == "ходить") 2 - y.toInt() else -1,
+                                x = if (action == "ходить") 2 - x.toInt() else -1,
+                                y = if (action == "ходить") y.toInt() else -1,
                             ),
                         )
                     },
