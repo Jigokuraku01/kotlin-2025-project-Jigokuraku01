@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -98,6 +99,14 @@ class TicTacToeComposable(
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.primary,
             )
+            if (isInputEnabled) {
+                Button(
+                    onClick = { inputResult = GameMove(action = "сдаться", playerId = getPlayerId(currentPlayerId), x = -1, y = -1) },
+                    modifier = Modifier.padding(top = 8.dp),
+                ) {
+                    Text("Сдаться")
+                }
+            }
             Text(
                 text = DataFromGame(),
                 style = MaterialTheme.typography.bodyLarge,
