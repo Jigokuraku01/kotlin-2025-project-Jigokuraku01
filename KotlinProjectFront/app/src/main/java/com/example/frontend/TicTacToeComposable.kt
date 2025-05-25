@@ -8,11 +8,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButtonDefaults.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -80,51 +86,65 @@ class TicTacToeComposable(
     @Suppress("ktlint:standard:function-naming")
     @Composable
     fun GameScreen() {
-        if (gameResultString != null) {
-            AlertDialog(
-                onDismissRequest = {},
-                title = { Text("Игра завершена") },
-                text = { Text(gameResultString!!) },
-                confirmButton = {
-                    Button(onClick = { gameResultString = null }) {
-                        Text("Ок")
-                    }
-                },
-            )
-        }
-        Column {
-            printFieldComposable()
-            Text(
-                text =
-                    if (isInputEnabled) {
-                        "Ваш ход ($currentPlayerId)"
-                    } else {
-                        "Ожидаем хода"
-                    },
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            if (isInputEnabled) {
-                Button(
-                    onClick = {
-                        inputResult =
-                            GameMove(
-                                action = "сдаться",
-                                playerId = getPlayerId(currentPlayerId),
-                                x = -1,
-                                y = -1,
-                            )
-                    },
-                    modifier = Modifier.padding(top = 8.dp),
-                ) {
-                    Text("Сдаться")
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                if (gameResultString != null) {
+                    AlertDialog(
+                        onDismissRequest = {},
+                        title = { Text("Игра завершена") },
+                        text = { Text(gameResultString!!) },
+                        confirmButton = {
+                            Button(onClick = { gameResultString = null }) {
+                                Text("Ок")
+                            }
+                        },
+                    )
                 }
+
+                printFieldComposable()
+                Text(
+                    text = if (isInputEnabled) "Ваш ход ($currentPlayerId)" else "Ожидаем хода",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                if (isInputEnabled) {
+                    Button(
+                        onClick = {
+                            inputResult =
+                                GameMove(
+                                    action = "сдаться",
+                                    playerId = getPlayerId(currentPlayerId),
+                                    x = -1,
+                                    y = -1,
+                                )
+                        },
+                        modifier = Modifier.padding(top = 8.dp),
+                    ) {
+                        Text("Сдаться")
+                    }
+                }
+                Text(
+                    text = DataFromGame(),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
-            Text(
-                text = DataFromGame(),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
+
+            IconButton(
+                onClick = { activity.finish() },
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Закрыть приложение",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                )
+            }
         }
     }
 
