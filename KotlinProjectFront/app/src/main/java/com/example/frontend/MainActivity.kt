@@ -67,7 +67,8 @@ class MainActivity : ComponentActivity() {
         var isConnected by remember { mutableStateOf(false) }
         var ipInputVisible by remember { mutableStateOf(true) }
         var manualIp by remember { mutableStateOf("") }
-        val ticTacToeGame = remember { TicTacToeComposable(this@MainActivity) { return@TicTacToeComposable status } }
+        var serverName by remember { mutableStateOf("") }
+        val currentGame = remember { TicTacToeComposable(this@MainActivity) { return@TicTacToeComposable status } }
 
         Column(
             modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -115,6 +116,15 @@ class MainActivity : ComponentActivity() {
                     keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth(),
                 )
+            } else {
+                OutlinedTextField(
+                    value = serverName,
+                    onValueChange = { serverName = it },
+                    label = { Text("Имя сервера(если хотите имя сервера, совпадающего с IP, оставьте поле пустым)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
 
             OutlinedTextField(
@@ -132,16 +142,19 @@ class MainActivity : ComponentActivity() {
                                 .launch {
                                     val server =
                                         MainServer(
-                                            ticTacToeGame,
+                                            currentGame,
                                             port.toInt(),
                                             onStatusUpdate = { newStatus ->
                                                 status = newStatus
                                                 println("--------SERVER--------\n" + newStatus)
                                             },
                                             setGameResult = { newGameResult ->
-                                                ticTacToeGame.gameResult = newGameResult
+                                                currentGame.gameResult = newGameResult
                                             },
                                         )
+                                    if (serverName != "") {
+                                        server.setNewServerName(serverName)
+                                    }
                                     server.startServer()
                                     isConnected = true
                                 }.join()
@@ -152,7 +165,7 @@ class MainActivity : ComponentActivity() {
                                 .launch {
                                     val client =
                                         ClientComposable(
-                                            ticTacToeGame,
+                                            currentGame,
                                             port.toInt(),
                                             this@MainActivity,
                                             onStatusUpdate = { newStatus ->
@@ -160,7 +173,7 @@ class MainActivity : ComponentActivity() {
                                                 println("--------CLIENT--------\n" + newStatus)
                                             },
                                             setGameResult = { newGameResult ->
-                                                ticTacToeGame.gameResult = newGameResult
+                                                currentGame.gameResult = newGameResult
                                             },
                                         )
 
