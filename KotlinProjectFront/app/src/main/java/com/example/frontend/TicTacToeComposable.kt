@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
@@ -35,6 +36,7 @@ import org.example.TicTacToeGame
 
 class TicTacToeComposable(
     private val activity: ComponentActivity,
+    private val DataFromGame: () -> String,
 ) : TicTacToeGame() {
     private var inputResult: GameMove? by mutableStateOf(null)
     private var showInputDialog by mutableStateOf(false)
@@ -79,15 +81,20 @@ class TicTacToeComposable(
                 moveInputDialog(
                     playerId = currentPlayerId,
                     onMoveSubmitted = { move ->
-                        inputResult = move
-                        showInputDialog = false
+                        if (logic.checkIfPosIsGood(SettingInfoImpl(playerId = move.playerId, x = move.x, y = move.y))) {
+                            inputResult = move
+                            showInputDialog = false
+                        }
                     },
                 )
             }
         }
     }
 
-    override suspend fun returnClassWithCorrectInput(playerId: String): GameMove {
+    override suspend fun returnClassWithCorrectInput(
+        playerId: String,
+        onStatusUpdate: (String) -> (Unit),
+    ): GameMove {
         activity.runOnUiThread {
             currentPlayerId = playerId
             showInputDialog = true
@@ -164,7 +171,7 @@ class TicTacToeComposable(
                                 action = action,
                                 playerId = getPlayerId(playerId),
                                 x = if (action == "ходить") x.toInt() else -1,
-                                y = if (action == "ходить") y.toInt() else -1,
+                                y = if (action == "ходить") 2 - y.toInt() else -1,
                             ),
                         )
                     },
@@ -208,5 +215,10 @@ class TicTacToeComposable(
                 }
             }
         }
+        Text(
+            text = DataFromGame(),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }

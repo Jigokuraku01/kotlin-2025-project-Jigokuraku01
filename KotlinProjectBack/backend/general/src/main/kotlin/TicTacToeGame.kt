@@ -32,22 +32,34 @@ open class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
         throw IllegalArgumentException("invalid player id")
     }
 
-    override suspend fun returnClassWithCorrectInput(playerId: String): GameMove {
-        print("Вы играете за ${getPlayerId(playerId)}. Что бы вы хотели сделать?(ходить, сдаться): ")
-        val action = readln()
-        if (!(action == "ходить" || action == "сдаться")) {
-            throw IllegalArgumentException("invalid action: $action")
+    override suspend fun returnClassWithCorrectInput(
+        playerId: String,
+        onStatusUpdate: (String) -> Unit,
+    ): GameMove {
+        while (true) {
+            try {
+                print("Вы играете за ${getPlayerId(playerId)}. Что бы вы хотели сделать?(ходить, сдаться): ")
+                val action = readln()
+                if (!(action == "ходить" || action == "сдаться")) {
+                    throw IllegalArgumentException("invalid action: $action")
+                }
+                var x = -1
+                var y = -1
+                if (action == "ходить") {
+                    print("Введите x: ")
+                    x = readln().trim().toInt()
+                    print("Введите y: ")
+                    y = readln().trim().toInt()
+                }
+                if (!logic.checkIfPosIsGood(SettingInfoImpl(playerId = getPlayerId(playerId), x = x, y = y))) {
+                    throw Exception("Invalid input x = $x, y = $y\n")
+                }
+                val ans = GameMove(action = action, playerId = getPlayerId(playerId), x = x, y = y)
+                return ans
+            } catch (e: Exception) {
+                onStatusUpdate("Exception ${e.message} handled")
+            }
         }
-        var x = -1
-        var y = -1
-        if (action == "ходить") {
-            print("Введите x: ")
-            x = readln().trim().toInt()
-            print("Введите y: ")
-            y = readln().trim().toInt()
-        }
-        val ans = GameMove(action = action, playerId = getPlayerId(playerId), x = x, y = y)
-        return ans
     }
 
     override fun decerializeJsonFromStringToInfoSending(input: String): GameMove {
@@ -65,7 +77,7 @@ open class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
         return field[i][j]
     }
 
-    private val logic =
+    protected val logic =
         object : IGame.InnerLogic() {
             override fun checkIfPosIsGood(info: SettingInfo): Boolean {
                 val actualInfo = info as SettingInfoImpl

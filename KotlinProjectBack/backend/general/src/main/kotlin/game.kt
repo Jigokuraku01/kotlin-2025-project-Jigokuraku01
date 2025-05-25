@@ -28,7 +28,10 @@ interface IGame<T : IGame.InfoForSending> {
 
     fun decerializeJsonFromStringToInfoSending(input: String): InfoForSending
 
-    suspend fun returnClassWithCorrectInput(playerId: String): InfoForSending
+    suspend fun returnClassWithCorrectInput(
+        playerId: String,
+        onStatusUpdate: (String) -> Unit = {},
+    ): InfoForSending
 
     abstract class InnerLogic {
         abstract fun checkIfPosIsGood(info: SettingInfo): Boolean

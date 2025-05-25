@@ -135,7 +135,7 @@ open class MainClient<T : IGame.InfoForSending>(
                         break
                     }
 
-                    val clentMove = currentGame.returnClassWithCorrectInput("client")
+                    val clentMove = currentGame.returnClassWithCorrectInput("client", onStatusUpdate)
                     output?.println(Json.encodeToString(clentMove))
                     currentGameState = currentGame.makeMove(clentMove)
                 }

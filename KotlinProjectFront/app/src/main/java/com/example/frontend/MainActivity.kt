@@ -67,7 +67,7 @@ class MainActivity : ComponentActivity() {
         var isConnected by remember { mutableStateOf(false) }
         var ipInputVisible by remember { mutableStateOf(true) }
         var manualIp by remember { mutableStateOf("") }
-        val ticTacToeGame = remember { TicTacToeComposable(this@MainActivity) }
+        val ticTacToeGame = remember { TicTacToeComposable(this@MainActivity) { return@TicTacToeComposable status } }
 
         Column(
             modifier = Modifier.fillMaxSize().padding(16.dp),

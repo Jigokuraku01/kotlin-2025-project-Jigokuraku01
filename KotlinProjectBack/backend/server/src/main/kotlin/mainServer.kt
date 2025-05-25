@@ -85,7 +85,7 @@ class MainServer<T : IGame.InfoForSending>(
         customScope
             .launch {
                 while (currentGameState == IGame.GameState.ONGOING) {
-                    val serverMove = currentGame.returnClassWithCorrectInput("server")
+                    val serverMove = currentGame.returnClassWithCorrectInput("server", onStatusUpdate)
                     output?.println(Json.encodeToString(serverMove))
                     currentGameState = currentGame.makeMove(serverMove)
                     if (currentGameState != IGame.GameState.ONGOING) {
