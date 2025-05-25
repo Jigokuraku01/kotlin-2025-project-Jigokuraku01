@@ -150,7 +150,7 @@ open class MainClient<T : IGame.InfoForSending>(
         }
     }
 
-    private suspend fun startClient(
+    private fun startClient(
         port: Int,
         ip: String,
     ): Socket? =

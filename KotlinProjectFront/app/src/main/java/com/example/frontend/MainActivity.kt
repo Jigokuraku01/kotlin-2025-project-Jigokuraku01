@@ -100,7 +100,7 @@ class MainActivity : ComponentActivity() {
 
             OutlinedTextField(
                 value = port,
-                onValueChange = { port = it },
+                onValueChange = { port = if (it.toIntOrNull() != null) it else port },
                 label = { Text("Порт") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
@@ -134,61 +134,57 @@ class MainActivity : ComponentActivity() {
             )
             Button(
                 onClick = {
-                    if (port.toIntOrNull() != null) {
-                        if (mode == "server") {
-                            lifecycleScope.launch(Dispatchers.IO) {
-                                customScope
-                                    .launch {
-                                        val server =
-                                            MainServer(
-                                                currentGame,
-                                                port.toInt(),
-                                                onStatusUpdate = { newStatus ->
-                                                    status = newStatus
-                                                    println("--------SERVER--------\n$newStatus")
-                                                },
-                                                setGameResult = { newGameResult ->
-                                                    currentGame.gameResult = newGameResult
-                                                },
-                                            )
-                                        if (serverName != "") {
-                                            server.setNewServerName(serverName)
-                                        }
-                                        server.startServer()
-                                        isConnected = true
-                                    }.join()
-                            }
-                        } else {
-                            lifecycleScope.launch(Dispatchers.IO) {
-                                customScope
-                                    .launch {
-                                        val client =
-                                            ClientComposable(
-                                                currentGame,
-                                                port.toInt(),
-                                                this@MainActivity,
-                                                onStatusUpdate = { newStatus ->
-                                                    status = newStatus
-                                                    println("--------CLIENT--------\n$newStatus")
-                                                },
-                                                setGameResult = { newGameResult ->
-                                                    currentGame.gameResult = newGameResult
-                                                },
-                                            )
-
-                                        val selectedIp =
-                                            if (manualIp.isNotBlank()) manualIp else client.selectGoodServer()
-                                        if (selectedIp != null) {
-                                            client.startClient(selectedIp)
-                                            isConnected = true
-                                        } else {
-                                            status = "🔴 Сервер не выбран или не найден"
-                                        }
-                                    }.join()
-                            }
+                    if (mode == "server") {
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            customScope
+                                .launch {
+                                    val server =
+                                        MainServer(
+                                            currentGame,
+                                            port.toInt(),
+                                            onStatusUpdate = { newStatus ->
+                                                status = newStatus
+                                                println("--------SERVER--------\n$newStatus")
+                                            },
+                                            setGameResult = { newGameResult ->
+                                                currentGame.gameResult = newGameResult
+                                            },
+                                        )
+                                    if (serverName != "") {
+                                        server.setNewServerName(serverName)
+                                    }
+                                    server.startServer()
+                                    isConnected = true
+                                }.join()
                         }
                     } else {
-                        status = "🔴 Некорректный порт"
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            customScope
+                                .launch {
+                                    val client =
+                                        ClientComposable(
+                                            currentGame,
+                                            port.toInt(),
+                                            this@MainActivity,
+                                            onStatusUpdate = { newStatus ->
+                                                status = newStatus
+                                                println("--------CLIENT--------\n$newStatus")
+                                            },
+                                            setGameResult = { newGameResult ->
+                                                currentGame.gameResult = newGameResult
+                                            },
+                                        )
+
+                                    val selectedIp =
+                                        if (manualIp.isNotBlank()) manualIp else client.selectGoodServer()
+                                    if (selectedIp != null) {
+                                        client.startClient(selectedIp)
+                                        isConnected = true
+                                    } else {
+                                        status = "🔴 Сервер не выбран или не найден"
+                                    }
+                                }.join()
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
