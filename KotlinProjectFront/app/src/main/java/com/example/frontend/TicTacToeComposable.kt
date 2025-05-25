@@ -3,30 +3,24 @@ package com.example.frontend
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -39,12 +33,12 @@ class TicTacToeComposable(
     private val DataFromGame: () -> String,
 ) : TicTacToeGame() {
     private var inputResult: GameMove? by mutableStateOf(null)
-    private var showInputDialog by mutableStateOf(false)
     private var currentPlayerId by mutableStateOf("")
     private var alreadyRendered = false
     private var fieldState by mutableStateOf(Array(3) { arrayOfNulls<String>(3) })
     public var gameResult: IGame.GameState? by mutableStateOf(null)
     private var gameResultString: String? by mutableStateOf(null)
+    private var isInputEnabled by mutableStateOf(false)
 
     private fun updateFieldState() {
         val newField =
@@ -99,19 +93,16 @@ class TicTacToeComposable(
         }
         Column {
             printFieldComposable()
-            if (showInputDialog) {
-                moveInputDialog(
-                    playerId = currentPlayerId,
-                    onMoveSubmitted = { move ->
-                        if (move.action == "сдаться" ||
-                            logic.checkIfPosIsGood(SettingInfoImpl(playerId = move.playerId, x = move.x, y = move.y))
-                        ) {
-                            inputResult = move
-                            showInputDialog = false
-                        }
-                    },
-                )
-            }
+            Text(
+                text = if (isInputEnabled) "Ваш ход ($currentPlayerId)" else "Ожидаем хода...",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = DataFromGame(),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
     }
 
@@ -121,91 +112,16 @@ class TicTacToeComposable(
     ): GameMove {
         activity.runOnUiThread {
             currentPlayerId = playerId
-            showInputDialog = true
+            isInputEnabled = true
             inputResult = null
         }
         while (inputResult == null) {
             delay(100)
         }
-        return inputResult!!.also { inputResult = null }
-    }
-
-    @Composable
-    private fun moveInputDialog(
-        playerId: String,
-        onMoveSubmitted: (GameMove) -> Unit,
-    ) {
-        var action by remember { mutableStateOf("ходить") }
-        var x by remember { mutableStateOf("0") }
-        var y by remember { mutableStateOf("0") }
-
-        AlertDialog(
-            onDismissRequest = { /* Нельзя закрыть без ввода */ },
-            title = { Text("Ход игрока $playerId") },
-            text = {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(
-                            selected = action == "ходить",
-                            onClick = { action = "ходить" },
-                        )
-                        Text("Ходить")
-
-                        Spacer(modifier = Modifier.width(16.dp))
-
-                        RadioButton(
-                            selected = action == "сдаться",
-                            onClick = { action = "сдаться" },
-                        )
-                        Text("Сдаться")
-                    }
-
-                    if (action == "ходить") {
-                        Row {
-                            OutlinedTextField(
-                                value = x,
-                                onValueChange = { x = it },
-                                label = { Text("X (0-2)") },
-                                modifier = Modifier.width(100.dp),
-                                keyboardOptions =
-                                    KeyboardOptions(
-                                        keyboardType = KeyboardType.Number,
-                                    ),
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            OutlinedTextField(
-                                value = y,
-                                onValueChange = { y = it },
-                                label = { Text("Y (0-2)") },
-                                modifier = Modifier.width(100.dp),
-                                keyboardOptions =
-                                    KeyboardOptions(
-                                        keyboardType = KeyboardType.Number,
-                                    ),
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (x.toIntOrNull() != null && y.toIntOrNull() != null) {
-                            onMoveSubmitted(
-                                GameMove(
-                                    action = action,
-                                    playerId = getPlayerId(playerId),
-                                    x = if (action == "ходить") 2 - y.toInt() else -1,
-                                    y = if (action == "ходить") x.toInt() else -1,
-                                ),
-                            )
-                        }
-                    },
-                ) {
-                    Text("Подтвердить")
-                }
-            },
-        )
+        return inputResult!!.also {
+            inputResult = null
+            isInputEnabled = false
+        }
     }
 
     @Composable
@@ -222,7 +138,21 @@ class TicTacToeComposable(
                             modifier =
                                 Modifier
                                     .size(80.dp)
-                                    .border(1.dp, Color.Black),
+                                    .border(1.dp, Color.Black)
+                                    .clickable(
+                                        enabled = isInputEnabled && fieldState[i][j] == null,
+                                        onClick = {
+                                            if (isInputEnabled) {
+                                                inputResult =
+                                                    GameMove(
+                                                        action = "ходить",
+                                                        playerId = getPlayerId(currentPlayerId),
+                                                        x = i,
+                                                        y = j,
+                                                    )
+                                            }
+                                        },
+                                    ),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
@@ -241,10 +171,5 @@ class TicTacToeComposable(
                 }
             }
         }
-        Text(
-            text = DataFromGame(),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.primary,
-        )
     }
 }
