@@ -81,6 +81,12 @@ open class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
         object : IGame.InnerLogic() {
             override fun checkIfPosIsGood(info: SettingInfo): Boolean {
                 val actualInfo = info as SettingInfoImpl
+                if (!(actualInfo.x >= 0 && actualInfo.x < field.size)) {
+                    return false
+                }
+                if (!(actualInfo.y >= 0 && actualInfo.y < field[actualInfo.x].size)) {
+                    return false
+                }
                 return field[actualInfo.x][actualInfo.y].isEmpty()
             }
 
