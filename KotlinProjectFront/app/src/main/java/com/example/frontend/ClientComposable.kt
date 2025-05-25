@@ -88,9 +88,19 @@ class ClientComposable<T : IGame.InfoForSending>(
                 IpSelectionDialog(
                     ipList = availableServers,
                     onIpSelected = { ip ->
+                        activity.runOnUiThread {
+                            activity.setContent {
+                                Box(modifier = Modifier.fillMaxSize()) {}
+                            }
+                        }
                         selectionDeferred.complete(ip)
                     },
                     onDismiss = {
+                        activity.runOnUiThread {
+                            activity.setContent {
+                                Box(modifier = Modifier.fillMaxSize()) {}
+                            }
+                        }
                         selectionDeferred.complete(null)
                     },
                 )
