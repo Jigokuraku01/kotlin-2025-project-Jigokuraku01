@@ -103,7 +103,9 @@ class TicTacToeComposable(
                 moveInputDialog(
                     playerId = currentPlayerId,
                     onMoveSubmitted = { move ->
-                        if (logic.checkIfPosIsGood(SettingInfoImpl(playerId = move.playerId, x = move.x, y = move.y))) {
+                        if (move.action == "сдаться" ||
+                            logic.checkIfPosIsGood(SettingInfoImpl(playerId = move.playerId, x = move.x, y = move.y))
+                        ) {
                             inputResult = move
                             showInputDialog = false
                         }
@@ -192,8 +194,8 @@ class TicTacToeComposable(
                             GameMove(
                                 action = action,
                                 playerId = getPlayerId(playerId),
-                                x = if (action == "ходить") 2 - x.toInt() else -1,
-                                y = if (action == "ходить") y.toInt() else -1,
+                                y = if (action == "ходить") 2 - y.toInt() else -1,
+                                x = if (action == "ходить") x.toInt() else -1,
                             ),
                         )
                     },
