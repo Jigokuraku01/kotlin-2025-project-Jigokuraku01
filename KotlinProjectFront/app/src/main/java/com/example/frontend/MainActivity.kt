@@ -130,15 +130,16 @@ class MainActivity : ComponentActivity() {
                         lifecycleScope.launch(Dispatchers.IO) {
                             customScope
                                 .launch {
-                                    ticTacToeGame.printField()
-                                    MainServer(
-                                        ticTacToeGame,
-                                        port.toInt(),
-                                        onStatusUpdate = { newStatus ->
-                                            status = newStatus
-                                            println("--------SERVER--------\n" + newStatus)
-                                        },
-                                    ).startServer()
+                                    val server =
+                                        MainServer(
+                                            ticTacToeGame,
+                                            port.toInt(),
+                                            onStatusUpdate = { newStatus ->
+                                                status = newStatus
+                                                println("--------SERVER--------\n" + newStatus)
+                                            },
+                                        )
+                                    server.startServer()
                                     isConnected = true
                                 }.join()
                         }
@@ -159,7 +160,6 @@ class MainActivity : ComponentActivity() {
 
                                     val selectedIp = if (manualIp.isNotBlank()) manualIp else client.selectGoodServer()
                                     if (selectedIp != null) {
-                                        ticTacToeGame.printField()
                                         client.startClient(selectedIp)
                                         isConnected = true
                                     } else {

@@ -106,6 +106,7 @@ open class MainClient<T : IGame.InfoForSending>(
     }
 
     private suspend fun startCommunicate() {
+        currentGame.printField()
         var currentGameState = IGame.GameState.ONGOING
         customScope
             .launch {
@@ -171,8 +172,10 @@ fun main() {
     try {
         print("Введите порт для подключения: ")
         val port = readln().toInt()
+        println("Введите IP для подключения: ")
+        val ip = readln()
         runBlocking {
-            MainClient(TicTacToeGame(), port, { a -> println(a) }).startClient()
+            MainClient(TicTacToeGame(), port, { a -> println(a) }).startClient(ip)
         }
     } catch (e: Exception) {
         println("Exception handled: ${e.message}")

@@ -20,6 +20,8 @@ interface IGame<T : IGame.InfoForSending> {
 
     fun returnInfoSendingClass(): KSerializer<out InfoForSending>
 
+    fun printField()
+
     fun getPlayerId(name: String): String
 
     fun makeMove(info: InfoForSending): GameState

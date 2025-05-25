@@ -78,7 +78,7 @@ open class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
             }
         }
 
-    open fun printField() {
+    override fun printField() {
         field.forEach { row ->
             println(row.joinToString(" | ") { it.ifEmpty { " " } })
             println("---------")

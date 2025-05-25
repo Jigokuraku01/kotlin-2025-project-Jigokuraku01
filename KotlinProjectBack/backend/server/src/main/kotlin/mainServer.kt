@@ -80,6 +80,7 @@ class MainServer<T : IGame.InfoForSending>(
     }
 
     suspend fun startCommunicate() {
+        currentGame.printField()
         var currentGameState = IGame.GameState.ONGOING
         customScope
             .launch {
