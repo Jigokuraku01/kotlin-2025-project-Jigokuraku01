@@ -25,7 +25,7 @@ class ClientComposable<T : IGame.InfoForSending>(
     private val onStatusUpdate: (String) -> Unit = {},
     private val setGameResult: (IGame.GameState) -> Unit = {},
 ) : MainClient<T>(currentGame, port, onStatusUpdate, setGameResult) {
-    private var availableServers by mutableStateOf<List<String>>(emptyList())
+    private var availableServers by mutableStateOf<List<Pair<String, String>>>(emptyList())
 
     @Suppress("ktlint:standard:function-naming")
     @Composable
@@ -75,7 +75,7 @@ class ClientComposable<T : IGame.InfoForSending>(
         )
     }
 
-    override suspend fun selectIpFromList(list: List<String>): String? =
+    override suspend fun selectIpFromList(list: List<Pair<String, String>>): String? =
         coroutineScope {
             availableServers = list
             if (list.isEmpty()) {
@@ -87,14 +87,14 @@ class ClientComposable<T : IGame.InfoForSending>(
 
             activity.setContent {
                 IpSelectionDialog(
-                    ipList = availableServers,
+                    ipList = availableServers.map { it -> it.first }.distinct(),
                     onIpSelected = { ip ->
                         activity.runOnUiThread {
                             activity.setContent {
                                 Box(modifier = Modifier.fillMaxSize()) {}
                             }
                         }
-                        selectionDeferred.complete(ip)
+                        selectionDeferred.complete(list.first { it.first == ip }.second)
                     },
                     onDismiss = {
                         activity.runOnUiThread {

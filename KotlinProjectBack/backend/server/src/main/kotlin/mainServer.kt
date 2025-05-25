@@ -29,6 +29,7 @@ class MainServer<T : IGame.InfoForSending>(
     private val onStatusUpdate: (String) -> Unit = {},
     private val setGameResult: (IGame.GameState) -> Unit = {},
 ) {
+    var currentServerName: String? = null
     var input: BufferedReader? = null
     var output: PrintWriter? = null
     private val ip = getLocalIpAddress() ?: "0.0.0.0"
@@ -47,6 +48,10 @@ class MainServer<T : IGame.InfoForSending>(
                 selector.close()
             }
         }
+
+    fun setNewServerName(newName: String) {
+        currentServerName = newName
+    }
 
     fun getLocalIpAddress(): String? {
         try {
@@ -145,7 +150,16 @@ class MainServer<T : IGame.InfoForSending>(
                                         tmpOutput.println(
                                             Json.encodeToString(
                                                 ServerInfo(
-                                                    serverName = actualIp,
+                                                    serverName =
+                                                        (
+                                                            if (currentServerName ==
+                                                                null
+                                                            ) {
+                                                                actualIp
+                                                            } else {
+                                                                currentServerName
+                                                            }
+                                                        ).toString(),
                                                     port = port,
                                                 ),
                                             ),

@@ -38,20 +38,20 @@ open class MainClient<T : IGame.InfoForSending>(
         job.join()
     }
 
-    open suspend fun selectIpFromList(list: List<String>): String? {
+    open suspend fun selectIpFromList(list: List<Pair<String, String>>): String? {
         list.forEach {
-            println("Possible IP: $it")
+            println("Possible IP: ${it.second}")
         }
         print("Введите нужный IP: ")
         val ansIP = readLine()?.trim()
-        if (!list.contains(ansIP)) {
+        if (list.none { it.second == ansIP }) {
             throw InvalidPhaseException("invalid ip")
         }
         return ansIP
     }
 
     suspend fun selectGoodServer(): String? {
-        val listOfPossibeIP = mutableListOf<String>()
+        val listOfPossibeIP = mutableListOf<Pair<String, String>>()
         val x = scanNetwork()
         val job =
             customScope.launch {
@@ -74,7 +74,7 @@ open class MainClient<T : IGame.InfoForSending>(
                                 val serverInfoSerializable =
                                     tmpInput.readLine() ?: throw Exception("input failure with ip $posIP")
                                 val serverInfo = Json.decodeFromString<ServerInfo>(serverInfoSerializable)
-                                listOfPossibeIP.add(serverInfo.serverName)
+                                listOfPossibeIP.add(Pair(serverInfo.serverName, posIP))
                                 socket.close()
                             } catch (e: Exception) {
                                 println(

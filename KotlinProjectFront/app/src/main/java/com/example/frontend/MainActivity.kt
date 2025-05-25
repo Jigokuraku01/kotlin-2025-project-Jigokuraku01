@@ -113,16 +113,14 @@ class MainActivity : ComponentActivity() {
                     onValueChange = { manualIp = it },
                     label = { Text("IP сервера (оставьте пустым для автопоиска серверов)") },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth(),
                 )
             } else {
                 OutlinedTextField(
                     value = serverName,
                     onValueChange = { serverName = it },
-                    label = { Text("Имя сервера(если хотите имя сервера, совпадающего с IP, оставьте поле пустым)") },
+                    label = { Text("Имя сервера(если хотите имя сервера, совпадающим с IP, оставьте поле пустым)") },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -146,7 +144,7 @@ class MainActivity : ComponentActivity() {
                                             port.toInt(),
                                             onStatusUpdate = { newStatus ->
                                                 status = newStatus
-                                                println("--------SERVER--------\n" + newStatus)
+                                                println("--------SERVER--------\n$newStatus")
                                             },
                                             setGameResult = { newGameResult ->
                                                 currentGame.gameResult = newGameResult
@@ -170,7 +168,7 @@ class MainActivity : ComponentActivity() {
                                             this@MainActivity,
                                             onStatusUpdate = { newStatus ->
                                                 status = newStatus
-                                                println("--------CLIENT--------\n" + newStatus)
+                                                println("--------CLIENT--------\n$newStatus")
                                             },
                                             setGameResult = { newGameResult ->
                                                 currentGame.gameResult = newGameResult

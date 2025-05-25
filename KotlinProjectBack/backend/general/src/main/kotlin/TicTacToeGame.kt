@@ -109,22 +109,31 @@ open class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
     }
 
     override fun checkWinner(): String? {
-        val lines =
-            listOf(
-                listOf(field[0][0], field[0][1], field[0][2]),
-                listOf(field[1][0], field[1][1], field[1][2]),
-                listOf(field[2][0], field[2][1], field[2][2]),
-                listOf(field[0][0], field[1][0], field[2][0]),
-                listOf(field[0][1], field[1][1], field[2][1]),
-                listOf(field[0][2], field[1][2], field[2][2]),
-                listOf(field[0][0], field[1][1], field[2][2]),
-                listOf(field[0][2], field[1][1], field[2][0]),
-            )
+        for (i in field.indices) {
+            val row = field[i]
+            if (row.all { it == row[0] && it.isNotEmpty() }) {
+                return row[0]
+            }
+        }
 
-        return lines
-            .firstOrNull { line ->
-                line.all { it == "X" } || line.all { it == "O" }
-            }?.firstOrNull()
+        for (i in field.indices) {
+            val col = List(field.size) { j -> field[j][i] }
+            if (col.all { it == col[0] && it.isNotEmpty() }) {
+                return col[0]
+            }
+        }
+
+        val mainDiagonal = List(field.size) { i -> field[i][i] }
+        if (mainDiagonal.all { it == mainDiagonal[0] && it.isNotEmpty() }) {
+            return mainDiagonal[0]
+        }
+
+        val antiDiagonal = List(field.size) { i -> field[i][field.size - 1 - i] }
+        if (antiDiagonal.all { it == antiDiagonal[0] && it.isNotEmpty() }) {
+            return antiDiagonal[0]
+        }
+
+        return null
     }
 
     override fun makeMove(info: IGame.InfoForSending): IGame.GameState {
