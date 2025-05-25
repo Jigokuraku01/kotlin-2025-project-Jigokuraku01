@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity() {
         var isConnected by remember { mutableStateOf(false) }
         var ipInputVisible by remember { mutableStateOf(true) }
         var manualIp by remember { mutableStateOf("") }
+        val ticTacToeGame = remember { TicTacToeComposable(this@MainActivity) }
 
         Column(
             modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -123,15 +124,15 @@ class MainActivity : ComponentActivity() {
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-
             Button(
                 onClick = {
                     if (mode == "server") {
                         lifecycleScope.launch(Dispatchers.IO) {
                             customScope
                                 .launch {
+                                    ticTacToeGame.printField()
                                     MainServer(
-                                        TicTacToeComposable(this@MainActivity),
+                                        ticTacToeGame,
                                         port.toInt(),
                                         onStatusUpdate = { newStatus ->
                                             status = newStatus
@@ -147,7 +148,7 @@ class MainActivity : ComponentActivity() {
                                 .launch {
                                     val client =
                                         ClientComposable(
-                                            TicTacToeComposable(this@MainActivity),
+                                            ticTacToeGame,
                                             port.toInt(),
                                             this@MainActivity,
                                             onStatusUpdate = { newStatus ->
@@ -158,6 +159,7 @@ class MainActivity : ComponentActivity() {
 
                                     val selectedIp = if (manualIp.isNotBlank()) manualIp else client.selectGoodServer()
                                     if (selectedIp != null) {
+                                        ticTacToeGame.printField()
                                         client.startClient(selectedIp)
                                         isConnected = true
                                     } else {

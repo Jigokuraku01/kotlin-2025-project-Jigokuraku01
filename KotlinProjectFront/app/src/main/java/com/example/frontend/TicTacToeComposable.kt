@@ -29,6 +29,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import org.example.IGame
+import org.example.IGame.GameState
 import org.example.TicTacToeGame
 
 class TicTacToeComposable(
@@ -37,9 +39,41 @@ class TicTacToeComposable(
     private var inputResult: GameMove? by mutableStateOf(null)
     private var showInputDialog by mutableStateOf(false)
     private var currentPlayerId by mutableStateOf("")
+    private var alreadyRendered = false
+    private var fieldState by mutableStateOf(Array(3) { arrayOfNulls<String>(3) })
+
+    private fun updateFieldState() {
+        val newField =
+            Array(3) { i ->
+                Array(3) { j ->
+                    getPlayerByPos(i, j)
+                }
+            }
+        fieldState = newField
+    }
+
+    override fun makeMove(move: IGame.InfoForSending): GameState {
+        val state = super.makeMove(move)
+        updateFieldState()
+        return state
+    }
 
     override fun printField() {
-        activity.setContent {
+        updateFieldState()
+        if (!alreadyRendered) {
+            alreadyRendered = true
+            activity.runOnUiThread {
+                activity.setContent {
+                    GameScreen()
+                }
+            }
+        }
+    }
+
+    @Suppress("ktlint:standard:function-naming")
+    @Composable
+    fun GameScreen() {
+        Column {
             printFieldComposable()
             if (showInputDialog) {
                 moveInputDialog(
@@ -62,7 +96,7 @@ class TicTacToeComposable(
         while (inputResult == null) {
             delay(100)
         }
-        return inputResult!!
+        return inputResult!!.also { inputResult = null }
     }
 
     @Composable
@@ -114,7 +148,6 @@ class TicTacToeComposable(
                                 label = { Text("Y (0-2)") },
                                 modifier = Modifier.width(100.dp),
                                 keyboardOptions =
-
                                     KeyboardOptions(
                                         keyboardType = KeyboardType.Number,
                                     ),
@@ -160,11 +193,11 @@ class TicTacToeComposable(
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                text = getPlayerByPos(i, j) ?: "",
+                                text = fieldState[i][j] ?: "",
                                 fontSize = 36.sp,
                                 fontWeight = FontWeight.Bold,
                                 color =
-                                    when (getPlayerByPos(i, j)) {
+                                    when (fieldState[i][j]) {
                                         "X" -> Color.Red
                                         "O" -> Color.Blue
                                         else -> Color.Transparent
