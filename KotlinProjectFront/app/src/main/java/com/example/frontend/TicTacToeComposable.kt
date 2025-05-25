@@ -129,7 +129,7 @@ class TicTacToeComposable(
                         onMoveSubmitted(
                             GameMove(
                                 action = action,
-                                playerId = playerId,
+                                playerId = getPlayerId(playerId),
                                 x = if (action == "ходить") x.toInt() else -1,
                                 y = if (action == "ходить") y.toInt() else -1,
                             ),

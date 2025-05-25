@@ -116,6 +116,7 @@ open class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
     }
 
     override fun makeMove(info: IGame.InfoForSending): IGame.GameState {
+        printField()
         val move = info as GameMove
         if (info.action == "сдаться") {
             return when (info.playerId) {

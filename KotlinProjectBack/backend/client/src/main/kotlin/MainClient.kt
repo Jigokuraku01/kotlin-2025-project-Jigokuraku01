@@ -1,7 +1,6 @@
 @file:Suppress("kt lint:standard:no-wildcard-imports", "ktlint:standard:no-wildcard-imports")
 
 package org.example
-import io.ktor.network.selector.ActorSelectorManager
 import io.ktor.util.pipeline.InvalidPhaseException
 import io.ktor.utils.io.close
 import kotlinx.coroutines.*
@@ -26,15 +25,12 @@ open class MainClient<T : IGame.InfoForSending>(
     var output: PrintWriter? = null
     val customScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    suspend fun startClient() {
+    suspend fun startClient(ip: String = "") {
         val job =
             customScope.launch {
-                val ip = selectGoodServer()
-                if (ip != null) {
-                    startClient(port, ip).also { socket ->
-                        if (socket != null) {
-                            startCommunicate()
-                        }
+                startClient(port, ip).also { socket ->
+                    if (socket != null) {
+                        startCommunicate()
                     }
                 }
             }
@@ -53,7 +49,7 @@ open class MainClient<T : IGame.InfoForSending>(
         return ansIP
     }
 
-    private suspend fun selectGoodServer(): String? {
+    suspend fun selectGoodServer(): String? {
         val listOfPossibeIP = mutableListOf<String>()
         val x = scanNetwork()
         val job =
@@ -63,7 +59,6 @@ open class MainClient<T : IGame.InfoForSending>(
                         launch {
                             try {
                                 onStatusUpdate("🔵 Пытаюсь подключиться к $posIP:$port")
-                                val selector = ActorSelectorManager(Dispatchers.IO)
                                 val socket = Socket()
                                 socket.connect(InetSocketAddress(posIP, port), 300)
                                 val tmpOutput = PrintWriter(socket.getOutputStream(), true)
@@ -177,7 +172,7 @@ fun main() {
         print("Введите порт для подключения: ")
         val port = readln().toInt()
         runBlocking {
-            MainClient(TicTacToeGame(), port) { a -> println(a) }.startClient()
+            MainClient(TicTacToeGame(), port, { a -> println(a) }).startClient()
         }
     } catch (e: Exception) {
         println("Exception handled: ${e.message}")

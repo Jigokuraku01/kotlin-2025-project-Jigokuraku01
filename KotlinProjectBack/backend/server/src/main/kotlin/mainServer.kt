@@ -115,10 +115,7 @@ class MainServer<T : IGame.InfoForSending>(
     }
 
     suspend fun startServer(port: Int) {
-        if (ip == null) {
-            throw Exception("IP finding problem")
-        }
-        onStatusUpdate("🔵 Сервер начал ожидать запросы по $ip:$port")
+        onStatusUpdate("🔵 Сервер начал ожидать запросы по ${getLocalIpAddress() ?: ip}:$port")
         var isServerStarted = false
         val serverSocket = ServerSocket(port)
         return suspendCancellableCoroutine { continuation ->
@@ -137,7 +134,7 @@ class MainServer<T : IGame.InfoForSending>(
                                         input = tmpInput
                                         output = tmpOutput
                                         isServerStarted = true
-                                        onStatusUpdate("🟢 Сервер запущен на $ip:$port")
+                                        onStatusUpdate("🟢 Сервер запущен на ${getLocalIpAddress() ?: ip}:$port")
                                         continuation.resume(Unit)
                                         return@withTimeoutOrNull
                                     } else {

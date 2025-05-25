@@ -65,23 +65,22 @@ class MainActivity : ComponentActivity() {
         var game by remember { mutableStateOf("TicTacToe") }
         var status by remember { mutableStateOf("Не подключено") }
         var isConnected by remember { mutableStateOf(false) }
+        var ipInputVisible by remember { mutableStateOf(true) }
+        var manualIp by remember { mutableStateOf("") }
 
         Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
+            modifier = Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text("Выберите режим:", style = MaterialTheme.typography.titleMedium)
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RadioButton(
                     selected = mode == "client",
-                    onClick = { mode = "client" },
+                    onClick = {
+                        mode = "client"
+                        ipInputVisible = true
+                    },
                 )
                 Text("Клиент")
 
@@ -89,7 +88,10 @@ class MainActivity : ComponentActivity() {
 
                 RadioButton(
                     selected = mode == "server",
-                    onClick = { mode = "server" },
+                    onClick = {
+                        mode = "server"
+                        ipInputVisible = false
+                    },
                 )
                 Text("Сервер")
             }
@@ -99,57 +101,68 @@ class MainActivity : ComponentActivity() {
                 onValueChange = { port = it },
                 label = { Text("Порт") },
                 singleLine = true,
-                keyboardOptions =
-                    KeyboardOptions.Default.copy(
-                        keyboardType = KeyboardType.Number,
-                    ),
+                keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            if (ipInputVisible) {
+                OutlinedTextField(
+                    value = manualIp,
+                    onValueChange = { manualIp = it },
+                    label = { Text("IP сервера (оставьте пустым для автопоиска серверов)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
             OutlinedTextField(
                 value = game,
                 onValueChange = { game = it },
                 label = { Text("Название игры: ") },
                 singleLine = true,
-                keyboardOptions =
-                    KeyboardOptions.Default.copy(
-                        keyboardType = KeyboardType.Number,
-                    ),
                 modifier = Modifier.fillMaxWidth(),
             )
 
             Button(
                 onClick = {
                     if (mode == "server") {
-                        lifecycleScope
-                            .launch(Dispatchers.IO) {
-                                customScope
-                                    .launch {
-                                        MainServer(
-                                            TicTacToeComposable(this@MainActivity),
-                                            port.toInt(),
-                                            onStatusUpdate = { newStatus ->
-                                                status = newStatus
-                                                println("--------SERVER--------\n" + newStatus)
-                                            },
-                                        ).startServer()
-                                        isConnected = true
-                                    }.join()
-                            }
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            customScope
+                                .launch {
+                                    MainServer(
+                                        TicTacToeComposable(this@MainActivity),
+                                        port.toInt(),
+                                        onStatusUpdate = { newStatus ->
+                                            status = newStatus
+                                            println("--------SERVER--------\n" + newStatus)
+                                        },
+                                    ).startServer()
+                                    isConnected = true
+                                }.join()
+                        }
                     } else {
                         lifecycleScope.launch(Dispatchers.IO) {
                             customScope
                                 .launch {
-                                    ClientComposable(
-                                        TicTacToeComposable(this@MainActivity),
-                                        port.toInt(),
-                                        this@MainActivity,
-                                        onStatusUpdate = { newStatus ->
-                                            status = newStatus
-                                            println("--------CLIENT--------\n" + newStatus)
-                                        },
-                                    ).startClient()
-                                    isConnected = true
+                                    val client =
+                                        ClientComposable(
+                                            TicTacToeComposable(this@MainActivity),
+                                            port.toInt(),
+                                            this@MainActivity,
+                                            onStatusUpdate = { newStatus ->
+                                                status = newStatus
+                                                println("--------CLIENT--------\n" + newStatus)
+                                            },
+                                        )
+
+                                    val selectedIp = if (manualIp.isNotBlank()) manualIp else client.selectGoodServer()
+                                    if (selectedIp != null) {
+                                        client.startClient(selectedIp)
+                                        isConnected = true
+                                    } else {
+                                        status = "🔴 Сервер не выбран или не найден"
+                                    }
                                 }.join()
                         }
                     }
@@ -162,12 +175,7 @@ class MainActivity : ComponentActivity() {
             Text(
                 text = status,
                 style = MaterialTheme.typography.bodyLarge,
-                color =
-                    if (isConnected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.error
-                    },
+                color = if (isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
             )
         }
     }
