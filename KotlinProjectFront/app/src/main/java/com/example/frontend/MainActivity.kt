@@ -134,56 +134,61 @@ class MainActivity : ComponentActivity() {
             )
             Button(
                 onClick = {
-                    if (mode == "server") {
-                        lifecycleScope.launch(Dispatchers.IO) {
-                            customScope
-                                .launch {
-                                    val server =
-                                        MainServer(
-                                            currentGame,
-                                            port.toInt(),
-                                            onStatusUpdate = { newStatus ->
-                                                status = newStatus
-                                                println("--------SERVER--------\n$newStatus")
-                                            },
-                                            setGameResult = { newGameResult ->
-                                                currentGame.gameResult = newGameResult
-                                            },
-                                        )
-                                    if (serverName != "") {
-                                        server.setNewServerName(serverName)
-                                    }
-                                    server.startServer()
-                                    isConnected = true
-                                }.join()
+                    if (port.toIntOrNull() != null) {
+                        if (mode == "server") {
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                customScope
+                                    .launch {
+                                        val server =
+                                            MainServer(
+                                                currentGame,
+                                                port.toInt(),
+                                                onStatusUpdate = { newStatus ->
+                                                    status = newStatus
+                                                    println("--------SERVER--------\n$newStatus")
+                                                },
+                                                setGameResult = { newGameResult ->
+                                                    currentGame.gameResult = newGameResult
+                                                },
+                                            )
+                                        if (serverName != "") {
+                                            server.setNewServerName(serverName)
+                                        }
+                                        server.startServer()
+                                        isConnected = true
+                                    }.join()
+                            }
+                        } else {
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                customScope
+                                    .launch {
+                                        val client =
+                                            ClientComposable(
+                                                currentGame,
+                                                port.toInt(),
+                                                this@MainActivity,
+                                                onStatusUpdate = { newStatus ->
+                                                    status = newStatus
+                                                    println("--------CLIENT--------\n$newStatus")
+                                                },
+                                                setGameResult = { newGameResult ->
+                                                    currentGame.gameResult = newGameResult
+                                                },
+                                            )
+
+                                        val selectedIp =
+                                            if (manualIp.isNotBlank()) manualIp else client.selectGoodServer()
+                                        if (selectedIp != null) {
+                                            client.startClient(selectedIp)
+                                            isConnected = true
+                                        } else {
+                                            status = "🔴 Сервер не выбран или не найден"
+                                        }
+                                    }.join()
+                            }
                         }
                     } else {
-                        lifecycleScope.launch(Dispatchers.IO) {
-                            customScope
-                                .launch {
-                                    val client =
-                                        ClientComposable(
-                                            currentGame,
-                                            port.toInt(),
-                                            this@MainActivity,
-                                            onStatusUpdate = { newStatus ->
-                                                status = newStatus
-                                                println("--------CLIENT--------\n$newStatus")
-                                            },
-                                            setGameResult = { newGameResult ->
-                                                currentGame.gameResult = newGameResult
-                                            },
-                                        )
-
-                                    val selectedIp = if (manualIp.isNotBlank()) manualIp else client.selectGoodServer()
-                                    if (selectedIp != null) {
-                                        client.startClient(selectedIp)
-                                        isConnected = true
-                                    } else {
-                                        status = "🔴 Сервер не выбран или не найден"
-                                    }
-                                }.join()
-                        }
+                        status = "🔴 Некорректный порт"
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),

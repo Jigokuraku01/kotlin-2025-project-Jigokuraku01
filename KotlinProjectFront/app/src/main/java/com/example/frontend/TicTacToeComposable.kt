@@ -190,14 +190,16 @@ class TicTacToeComposable(
             confirmButton = {
                 Button(
                     onClick = {
-                        onMoveSubmitted(
-                            GameMove(
-                                action = action,
-                                playerId = getPlayerId(playerId),
-                                x = if (action == "ходить") 2 - y.toInt() else -1,
-                                y = if (action == "ходить") x.toInt() else -1,
-                            ),
-                        )
+                        if (x.toIntOrNull() != null && y.toIntOrNull() != null) {
+                            onMoveSubmitted(
+                                GameMove(
+                                    action = action,
+                                    playerId = getPlayerId(playerId),
+                                    x = if (action == "ходить") 2 - y.toInt() else -1,
+                                    y = if (action == "ходить") x.toInt() else -1,
+                                ),
+                            )
+                        }
                     },
                 ) {
                     Text("Подтвердить")
