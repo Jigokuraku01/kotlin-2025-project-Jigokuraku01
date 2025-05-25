@@ -36,7 +36,7 @@ class TicTacToeComposable(
     private var currentPlayerId by mutableStateOf("")
     private var alreadyRendered = false
     private var fieldState by mutableStateOf(Array(3) { arrayOfNulls<String>(3) })
-    public var gameResult: IGame.GameState? by mutableStateOf(null)
+    public var gameResult: GameState? by mutableStateOf(null)
     private var gameResultString: String? by mutableStateOf(null)
     private var isInputEnabled by mutableStateOf(false)
 
@@ -94,7 +94,7 @@ class TicTacToeComposable(
         Column {
             printFieldComposable()
             Text(
-                text = if (isInputEnabled) "Ваш ход ($currentPlayerId)" else "Ожидаем хода...",
+                text = if (isInputEnabled) "Ваш ход ($currentPlayerId)" else "Ожидаем хода",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.primary,
             )
