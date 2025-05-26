@@ -87,7 +87,7 @@ class ClientComposable<T : IGame.InfoForSending>(
 
             activity.setContent {
                 IpSelectionDialog(
-                    ipList = availableServers.map { it -> it.first }.distinct(),
+                    ipList = availableServers.map { it -> "${it.first}(${it.second})" }.distinct(),
                     onIpSelected = { ip ->
                         activity.runOnUiThread {
                             activity.setContent {
