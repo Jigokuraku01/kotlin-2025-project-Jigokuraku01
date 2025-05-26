@@ -184,7 +184,7 @@ class TicTacToeComposable(
                                     .clickable(
                                         enabled = isInputEnabled && fieldState[i][j] == null,
                                         onClick = {
-                                            if (isInputEnabled) {
+                                            if (isInputEnabled && gameResultString == null) {
                                                 inputResult =
                                                     GameMove(
                                                         action = "ходить",

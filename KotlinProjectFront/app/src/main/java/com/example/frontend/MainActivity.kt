@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -68,135 +70,153 @@ class MainActivity : ComponentActivity() {
         var ipInputVisible by remember { mutableStateOf(true) }
         var manualIp by remember { mutableStateOf("") }
         var serverName by remember { mutableStateOf("") }
-        val currentGame = remember { TicTacToeComposable(this@MainActivity) { return@TicTacToeComposable status } }
-
-        Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text("Выберите режим:", style = MaterialTheme.typography.titleMedium)
-
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                RadioButton(
-                    selected = mode == "client",
-                    onClick = {
-                        mode = "client"
-                        ipInputVisible = true
-                    },
-                )
-                Text("Клиент")
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                RadioButton(
-                    selected = mode == "server",
-                    onClick = {
-                        mode = "server"
-                        ipInputVisible = false
-                    },
-                )
-                Text("Сервер")
-            }
-
-            OutlinedTextField(
-                value = port,
-                onValueChange = { port = if (it.toIntOrNull() != null) it else port },
-                label = { Text("Порт") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            if (ipInputVisible) {
-                OutlinedTextField(
-                    value = manualIp,
-                    onValueChange = { manualIp = it },
-                    label = { Text("IP сервера (оставьте пустым для автопоиска серверов)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            } else {
-                OutlinedTextField(
-                    value = serverName,
-                    onValueChange = { serverName = it },
-                    label = { Text("Имя сервера(если хотите имя сервера, совпадающим с IP, оставьте поле пустым)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-
-            OutlinedTextField(
-                value = game,
-                onValueChange = { game = it },
-                label = { Text("Название игры: ") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Button(
-                onClick = {
-                    if (mode == "server") {
-                        lifecycleScope.launch(Dispatchers.IO) {
-                            customScope
-                                .launch {
-                                    val server =
-                                        MainServer(
-                                            currentGame,
-                                            port.toInt(),
-                                            onStatusUpdate = { newStatus ->
-                                                status = newStatus
-                                                println("--------SERVER--------\n$newStatus")
-                                            },
-                                            setGameResult = { newGameResult ->
-                                                currentGame.gameResult = newGameResult
-                                            },
-                                        )
-                                    if (serverName != "") {
-                                        server.setNewServerName(serverName)
-                                    }
-                                    server.startServer()
-                                    isConnected = true
-                                }.join()
-                        }
-                    } else {
-                        lifecycleScope.launch(Dispatchers.IO) {
-                            customScope
-                                .launch {
-                                    val client =
-                                        ClientComposable(
-                                            currentGame,
-                                            port.toInt(),
-                                            this@MainActivity,
-                                            onStatusUpdate = { newStatus ->
-                                                status = newStatus
-                                                println("--------CLIENT--------\n$newStatus")
-                                            },
-                                            setGameResult = { newGameResult ->
-                                                currentGame.gameResult = newGameResult
-                                            },
-                                        )
-
-                                    val selectedIp =
-                                        if (manualIp.isNotBlank()) manualIp else client.selectGoodServer()
-                                    if (selectedIp != null) {
-                                        client.startClient(selectedIp)
-                                        isConnected = true
-                                    } else {
-                                        status = "🔴 Сервер не выбран или не найден"
-                                    }
-                                }.join()
-                        }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
+        val currentGame =
+            remember { TicTacToeComposable(this@MainActivity) { return@TicTacToeComposable status } }
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text(if (mode == "server") "Запустить сервер" else "Подключиться")
-            }
+                Text("Выберите режим:", style = MaterialTheme.typography.titleMedium)
 
-            Text(
-                text = status,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-            )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    RadioButton(
+                        selected = mode == "client",
+                        onClick = {
+                            mode = "client"
+                            ipInputVisible = true
+                        },
+                    )
+                    Text("Клиент")
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    RadioButton(
+                        selected = mode == "server",
+                        onClick = {
+                            mode = "server"
+                            ipInputVisible = false
+                        },
+                    )
+                    Text("Сервер")
+                }
+
+                OutlinedTextField(
+                    value = port,
+                    onValueChange = { port = if (it.toIntOrNull() != null) it else port },
+                    label = { Text("Порт") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                if (ipInputVisible) {
+                    OutlinedTextField(
+                        value = manualIp,
+                        onValueChange = { manualIp = it },
+                        label = { Text("IP сервера (оставьте пустым для автопоиска серверов)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    OutlinedTextField(
+                        value = serverName,
+                        onValueChange = { serverName = it },
+                        label = { Text("Имя сервера(если хотите имя сервера, совпадающим с IP, оставьте поле пустым)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+
+                OutlinedTextField(
+                    value = game,
+                    onValueChange = { game = it },
+                    label = { Text("Название игры: ") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Button(
+                    onClick = {
+                        if (mode == "server") {
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                customScope
+                                    .launch {
+                                        val server =
+                                            MainServer(
+                                                currentGame,
+                                                port.toInt(),
+                                                onStatusUpdate = { newStatus ->
+                                                    status = newStatus
+                                                    println("--------SERVER--------\n$newStatus")
+                                                },
+                                                setGameResult = { newGameResult ->
+                                                    currentGame.gameResult = newGameResult
+                                                },
+                                            )
+                                        if (serverName != "") {
+                                            server.setNewServerName(serverName)
+                                        }
+                                        server.startServer()
+                                        isConnected = true
+                                    }.join()
+                            }
+                        } else {
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                customScope
+                                    .launch {
+                                        val client =
+                                            ClientComposable(
+                                                currentGame,
+                                                port.toInt(),
+                                                this@MainActivity,
+                                                onStatusUpdate = { newStatus ->
+                                                    status = newStatus
+                                                    println("--------CLIENT--------\n$newStatus")
+                                                },
+                                                setGameResult = { newGameResult ->
+                                                    currentGame.gameResult = newGameResult
+                                                },
+                                            )
+
+                                        val selectedIp =
+                                            if (manualIp.isNotBlank()) manualIp else client.selectGoodServer()
+                                        if (selectedIp != null) {
+                                            client.startClient(selectedIp)
+                                            isConnected = true
+                                        } else {
+                                            status = "🔴 Сервер не выбран или не найден"
+                                        }
+                                    }.join()
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(if (mode == "server") "Запустить сервер" else "Подключиться")
+                }
+
+                Text(
+                    text = status,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                )
+            }
+            IconButton(
+                onClick = { finish() },
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Закрыть приложение",
+                    tint = MaterialTheme.colorScheme.onBackground,
+                )
+            }
         }
     }
 }
