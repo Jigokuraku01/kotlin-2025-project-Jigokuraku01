@@ -106,7 +106,7 @@ open class MainClient<T : IGame.InfoForSending>(
         return addresses
     }
 
-    private suspend fun startCommunicate() {
+    suspend fun startCommunicate() {
         currentGame.printField()
         var currentGameState = IGame.GameState.ONGOING
         customScope

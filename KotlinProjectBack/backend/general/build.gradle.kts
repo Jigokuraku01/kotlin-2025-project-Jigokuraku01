@@ -18,6 +18,9 @@ dependencies {
     implementation("io.ktor:ktor-network-tls:3.1.3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
     implementation("org.jetbrains.kotlin:kotlin-reflect:1.9.0")
+    testImplementation(project(":client"))
+    testImplementation("io.mockk:mockk:1.9.3")
+    testImplementation(project(":server"))
 }
 
 tasks.test {
