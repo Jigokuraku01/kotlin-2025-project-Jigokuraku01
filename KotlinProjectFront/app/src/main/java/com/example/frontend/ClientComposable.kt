@@ -5,7 +5,9 @@ package com.example.frontend
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
@@ -94,7 +96,7 @@ class ClientComposable<T : IGame.InfoForSending>(
                                 Box(modifier = Modifier.fillMaxSize()) {}
                             }
                         }
-                        selectionDeferred.complete(list.first { it.first == ip }.second)
+                        selectionDeferred.complete(list.first { "${it.first}(${it.second})" == ip }.second)
                     },
                     onDismiss = {
                         activity.runOnUiThread {
