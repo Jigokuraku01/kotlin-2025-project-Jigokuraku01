@@ -1,5 +1,8 @@
 package com.example.frontend
 
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.border
@@ -27,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -45,6 +49,8 @@ class TicTacToeComposable(
     var gameResult: GameState? by mutableStateOf(null)
     private var gameResultString: String? by mutableStateOf(null)
     private var isInputEnabled by mutableStateOf(false)
+    private var onStatusUpdate_: (String) -> (Unit) = { a -> a }
+    private val tgkURL = "https://t.me/+FCLWNaTEc7o3ZDUy"
 
     private fun updateFieldState() {
         val newField =
@@ -93,7 +99,37 @@ class TicTacToeComposable(
                     AlertDialog(
                         onDismissRequest = {},
                         title = { Text("Игра завершена") },
-                        text = { Text(gameResultString!!) },
+                        text = {
+                            Column {
+                                Text(
+                                    "${gameResultString!!}\nИгра закончена. Если хотите следить за новостями разработчика, переходите в его тгк",
+                                )
+                                Text(
+                                    text = "Перейти",
+                                    style =
+                                        MaterialTheme.typography.bodyMedium.copy(
+                                            color = MaterialTheme.colorScheme.primary,
+                                            textDecoration = TextDecoration.Underline,
+                                        ),
+                                    modifier =
+                                        Modifier
+                                            .clickable {
+                                                Toast
+                                                    .makeText(
+                                                        activity,
+                                                        "Открываем ссылку",
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                                val intent =
+                                                    Intent(
+                                                        Intent.ACTION_VIEW,
+                                                        Uri.parse(tgkURL),
+                                                    )
+                                                activity.startActivity(intent)
+                                            }.padding(4.dp),
+                                )
+                            }
+                        },
                         confirmButton = {
                             Button(onClick = { gameResultString = null }) {
                                 Text("Ок")
@@ -151,6 +187,7 @@ class TicTacToeComposable(
         playerId: String,
         onStatusUpdate: (String) -> (Unit),
     ): GameMove {
+        onStatusUpdate_ = onStatusUpdate
         activity.runOnUiThread {
             currentPlayerId = playerId
             isInputEnabled = true
