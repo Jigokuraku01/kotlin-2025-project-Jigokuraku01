@@ -3,6 +3,7 @@
 package org.example
 import io.ktor.network.selector.ActorSelectorManager
 import io.ktor.network.sockets.InetSocketAddress
+import io.ktor.network.sockets.Socket
 import io.ktor.network.sockets.aSocket
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +33,7 @@ class MainServer<T : IGame.InfoForSending>(
     var currentServerName: String? = null
     var input: BufferedReader? = null
     var output: PrintWriter? = null
+    var socket: java.net.Socket? = null
     private val ip = getLocalIpAddress() ?: "0.0.0.0"
     val customScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -121,6 +123,10 @@ class MainServer<T : IGame.InfoForSending>(
         }
     }
 
+    fun destroyConnection() {
+        socket?.close()
+    }
+
     suspend fun startServer(port: Int) {
         onStatusUpdate("🔵 Сервер начал ожидать запросы по ${getLocalIpAddress() ?: ip}:$port")
         var isServerStarted = false
@@ -138,6 +144,7 @@ class MainServer<T : IGame.InfoForSending>(
 
                                     val message = tmpInput.readLine() ?: throw Exception("input failure")
                                     if (message == "connection") {
+                                        socket = clientSocket
                                         input = tmpInput
                                         output = tmpOutput
                                         isServerStarted = true

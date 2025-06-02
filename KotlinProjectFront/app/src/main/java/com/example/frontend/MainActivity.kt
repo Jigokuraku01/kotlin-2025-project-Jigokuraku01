@@ -42,10 +42,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.example.MainServer
+import org.example.TicTacToeGame
 
 class MainActivity : ComponentActivity() {
     val customScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val job = SupervisorJob()
+    private var server: MainServer<TicTacToeGame.GameMove>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,6 +67,8 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         job.cancel()
+        server?.destroyConnection()
+        server = null
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -152,7 +156,7 @@ class MainActivity : ComponentActivity() {
                             lifecycleScope.launch(Dispatchers.IO) {
                                 customScope
                                     .launch {
-                                        val server =
+                                        server =
                                             MainServer(
                                                 currentGame,
                                                 port.toInt(),
@@ -165,9 +169,9 @@ class MainActivity : ComponentActivity() {
                                                 },
                                             )
                                         if (serverName != "") {
-                                            server.setNewServerName(serverName)
+                                            server?.setNewServerName(serverName)
                                         }
-                                        server.startServer()
+                                        server?.startServer()
                                         isConnected = true
                                     }.join()
                             }
