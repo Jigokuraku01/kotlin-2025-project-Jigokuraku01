@@ -1,69 +1,215 @@
-@file:Suppress("ktlint:standard:no-wildcard-imports")
+@file:Suppress("ktlint:standard:filename", "ktlint:standard:no-wildcard-imports")
 
 package org.example
-import io.ktor.network.selector.*
-import io.ktor.network.sockets.*
-import io.ktor.utils.io.readUTF8Line
-import io.ktor.utils.io.writeStringUtf8
-import kotlinx.coroutines.*
-import kotlinx.serialization.encodeToString
+import io.ktor.network.selector.ActorSelectorManager
+import io.ktor.network.sockets.InetSocketAddress
+import io.ktor.network.sockets.Socket
+import io.ktor.network.sockets.aSocket
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.PrintWriter
+import java.net.Inet4Address
+import java.net.NetworkInterface
+import java.net.ServerSocket
+import java.util.Collections
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
-class StartServer<T : IGame.InfoForSending>(
+class MainServer<T : IGame.InfoForSending>(
     private val currentGame: IGame<T>,
-    private val ip: String,
+    private val port: Int,
+    private val onStatusUpdate: (String) -> Unit = {},
+    private val setGameResult: (IGame.GameState) -> Unit = {},
 ) {
-    init {
-        var curSocket: Socket
-        runBlocking {
-            curSocket = startServer(ip)
-        }
-        startCommunicate(curSocket)
-    }
+    var currentServerName: String? = null
+    var input: BufferedReader? = null
+    var output: PrintWriter? = null
+    var socket: java.net.Socket? = null
+    private val ip = getLocalIpAddress() ?: "0.0.0.0"
+    val customScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    fun startCommunicate(curSocket: Socket) {
-        val output = curSocket.openWriteChannel(autoFlush = true)
-        val input = curSocket.openReadChannel()
-        var currentGameState = IGame.GameState.ONGOING
-        runBlocking {
-            while (currentGameState == IGame.GameState.ONGOING) {
-                val serverMove = currentGame.returnClassWithCorrectInput("server")
-                output.writeStringUtf8(Json.encodeToString(serverMove) + "\n")
-                currentGameState = currentGame.makeMove(serverMove)
-                if (currentGameState != IGame.GameState.ONGOING) {
-                    output.writeStringUtf8("Game Over: ${currentGameState.name}")
-                    break
+    suspend fun isPortAvailable(port: Int): Boolean =
+        withContext(Dispatchers.IO) {
+            val selector = ActorSelectorManager(Dispatchers.IO)
+            try {
+                aSocket(selector).tcp().bind(InetSocketAddress("0.0.0.0", port)).use {
+                    true
                 }
-
-                val clientJSon = input.readUTF8Line() ?: break
-                if (clientJSon.startsWith("Game Over:")) {
-                    break
-                }
-                try {
-                    println("Earned move from other player")
-                    val clientMove = currentGame.dexerializeJsonFromStringToInfoSending(clientJSon)
-                    currentGameState = currentGame.makeMove(clientMove)
-                } catch (e: Exception) {
-                    println("Json parsing error ${e.message}")
-                }
+            } catch (e: Exception) {
+                false
+            } finally {
+                selector.close()
             }
         }
+
+    fun setNewServerName(newName: String) {
+        currentServerName = newName
+    }
+
+    fun getLocalIpAddress(): String? {
+        try {
+            val networkInterfaces = Collections.list(NetworkInterface.getNetworkInterfaces())
+            for (intf in networkInterfaces) {
+                val addresses = Collections.list(intf.inetAddresses)
+                for (addr in addresses) {
+                    if (!addr.isLoopbackAddress && addr is Inet4Address) {
+                        return addr.hostAddress
+                    }
+                }
+            }
+        } catch (ex: Exception) {
+            ex.printStackTrace()
+        }
+        return null
+    }
+
+    suspend fun startServer() {
+        if (!isPortAvailable(port)) {
+            onStatusUpdate("🔴 Port $port is not available")
+            return
+        }
+        val job =
+            customScope.launch {
+                startServer(port)
+                    .also { socket ->
+                        startCommunicate()
+                    }
+            }
+        job.join()
+    }
+
+    suspend fun startCommunicate() {
+        currentGame.printField()
+        var currentGameState = IGame.GameState.ONGOING
+        customScope
+            .launch {
+                while (currentGameState == IGame.GameState.ONGOING) {
+                    val serverMove = currentGame.returnClassWithCorrectInput("server", onStatusUpdate)
+                    output?.println(Json.encodeToString(serverMove))
+                    currentGameState = currentGame.makeMove(serverMove)
+                    if (currentGameState != IGame.GameState.ONGOING) {
+                        output?.println("Game Over: ${currentGameState.name}")
+                        break
+                    }
+
+                    val clientJSon = input?.readLine() ?: break
+                    if (clientJSon.startsWith("Game Over:")) {
+                        break
+                    }
+                    try {
+                        println("Earned move from other player")
+                        val clientMove = currentGame.decerializeJsonFromStringToInfoSending(clientJSon)
+                        currentGameState = currentGame.makeMove(clientMove)
+                    } catch (e: Exception) {
+                        println("Json parsing error ${e.message}")
+                    }
+                }
+            }.join()
+
         when (currentGameState) {
-            IGame.GameState.DRAW -> println("Draw")
-            IGame.GameState.SERVER_WINS -> println("Server Wins")
-            IGame.GameState.CLIENT_WINS -> println("Client Wins")
-            else -> println("Incorrect state or other player disconnected")
+            IGame.GameState.DRAW -> setGameResult(IGame.GameState.DRAW)
+            IGame.GameState.SERVER_WINS -> setGameResult(IGame.GameState.SERVER_WINS)
+            IGame.GameState.CLIENT_WINS -> setGameResult(IGame.GameState.CLIENT_WINS)
+            else -> onStatusUpdate("Incorrect state or other player disconnected")
         }
     }
 
-    suspend fun startServer(ip: String): Socket {
-        val selector = ActorSelectorManager(Dispatchers.IO)
-        val serverSocket = aSocket(selector).tcp().bind(InetSocketAddress(ip, 12345))
-        val clientSocket = serverSocket.accept()
-        return clientSocket
+    fun destroyConnection() {
+        socket?.close()
+    }
+
+    suspend fun startServer(port: Int) {
+        onStatusUpdate("🔵 Сервер начал ожидать запросы по ${getLocalIpAddress() ?: ip}:$port")
+        var isServerStarted = false
+        val serverSocket = ServerSocket(port)
+        return suspendCancellableCoroutine { continuation ->
+            CoroutineScope(Dispatchers.IO + SupervisorJob())
+                .launch {
+                    try {
+                        while (!isServerStarted) {
+                            val clientSocket = serverSocket.accept()
+                            withTimeoutOrNull(5000) {
+                                try {
+                                    val tmpInput = BufferedReader(InputStreamReader(clientSocket.getInputStream()))
+                                    val tmpOutput = PrintWriter(clientSocket.getOutputStream(), true)
+
+                                    val message = tmpInput.readLine() ?: throw Exception("input failure")
+                                    if (message == "connection") {
+                                        socket = clientSocket
+                                        input = tmpInput
+                                        output = tmpOutput
+                                        isServerStarted = true
+                                        onStatusUpdate("🟢 Сервер запущен на ${getLocalIpAddress() ?: ip}:$port")
+                                        continuation.resume(Unit)
+                                        return@withTimeoutOrNull
+                                    } else {
+                                        tmpOutput.println("ok")
+                                        val actualIp = getLocalIpAddress() ?: ip
+                                        tmpOutput.println(
+                                            Json.encodeToString(
+                                                ServerInfo(
+                                                    serverName =
+                                                        (
+                                                            if (currentServerName ==
+                                                                null
+                                                            ) {
+                                                                actualIp
+                                                            } else {
+                                                                currentServerName
+                                                            }
+                                                        ).toString(),
+                                                    port = port,
+                                                ),
+                                            ),
+                                        )
+                                        if (!isServerStarted) {
+                                            tmpOutput.flush()
+                                            tmpInput.close()
+                                            clientSocket.close()
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    if (!isServerStarted) {
+                                        clientSocket.close()
+                                    }
+                                    throw e
+                                }
+                            } ?: run {
+                                if (!isServerStarted) {
+                                    clientSocket.close()
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        continuation.resumeWithException(e)
+                    }
+                }
+        }
     }
 }
 
 fun main() {
-    StartServer(TicTacToeGame(), "0.0.0.0")
+    println(
+        "Введите порт на котором хотите запустить сервер. Возможные порты от ${NetworkConfig.PORT_RANGE.first} до ${NetworkConfig.PORT_RANGE.last}: ",
+    )
+    try {
+        val port = readln().toInt()
+        if (port !in NetworkConfig.PORT_RANGE) {
+            throw IllegalArgumentException("incorrect port")
+        }
+        runBlocking {
+            MainServer(TicTacToeGame(), port, { a -> println(a) }).startServer()
+        }
+    } catch (e: Exception) {
+        println("Exception handled: ${e.message}")
+    }
 }

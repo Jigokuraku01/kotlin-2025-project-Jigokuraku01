@@ -1,11 +1,9 @@
 package org.example
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
-import org.example.IGame.InnerLogic.SettingInfo
 
-class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
+open class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
     private val field = Array(3) { Array(3) { "" } }
 
     @Serializable
@@ -34,39 +32,67 @@ class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
         throw IllegalArgumentException("invalid player id")
     }
 
-    override fun returnClassWithCorrectInput(playerId: String): GameMove {
-        print("Вы играете за ${getPlayerId(playerId)}. Что бы вы хотели сделать?(ходить, сдаться): ")
-        val action = readln()
-        if (!(action == "ходить" || action == "сдаться")) {
-            throw IllegalArgumentException("invalid action: $action")
+    override suspend fun returnClassWithCorrectInput(
+        playerId: String,
+        onStatusUpdate: (String) -> Unit,
+    ): GameMove {
+        while (true) {
+            try {
+                print("Вы играете за ${getPlayerId(playerId)}. Что бы вы хотели сделать?(ходить, сдаться): ")
+                val action = readln()
+                if (!(action == "ходить" || action == "сдаться")) {
+                    throw IllegalArgumentException("invalid action: $action")
+                }
+                var x = -1
+                var y = -1
+                if (action == "ходить") {
+                    print("Введите x: ")
+                    x = readln().trim().toInt()
+                    print("Введите y: ")
+                    y = readln().trim().toInt()
+                }
+                if (!logic.checkIfPosIsGood(SettingInfoImpl(playerId = getPlayerId(playerId), x = x, y = y))) {
+                    throw Exception("Invalid input x = $x, y = $y\n")
+                }
+                val ans = GameMove(action = action, playerId = getPlayerId(playerId), x = x, y = y)
+                return ans
+            } catch (e: Exception) {
+                onStatusUpdate("Exception ${e.message} handled")
+            }
         }
-        var x = -1
-        var y = -1
-        if (action == "ходить") {
-            print("Введите x: ")
-            x = readln().trim().toInt()
-            print("Введите y: ")
-            y = readln().trim().toInt()
-        }
-        val ans = GameMove(action = action, playerId = getPlayerId(playerId), x = x, y = y)
-        return ans
     }
 
-    override fun dexerializeJsonFromStringToInfoSending(input: String): GameMove =
-        Json {
-            ignoreUnknownKeys = true
-        }.decodeFromString<GameMove>(input)
+    override fun decerializeJsonFromStringToInfoSending(input: String): GameMove {
+        val json = Json { ignoreUnknownKeys = true }
+        return json.decodeFromString<GameMove>(input)
+    }
 
-    private val logic =
+    fun getPlayerByPos(
+        i: Int,
+        j: Int,
+    ): String? {
+        if (field[i][j] != "X" && field[i][j] != "O") {
+            return null
+        }
+        return field[i][j]
+    }
+
+    protected val logic =
         object : IGame.InnerLogic() {
             override fun checkIfPosIsGood(info: SettingInfo): Boolean {
-                val actialInfo = info as SettingInfoImpl
-                return field[actialInfo.x][actialInfo.y].isEmpty()
+                val actualInfo = info as SettingInfoImpl
+                if (!(actualInfo.x >= 0 && actualInfo.x < field.size)) {
+                    return false
+                }
+                if (!(actualInfo.y >= 0 && actualInfo.y < field[actualInfo.x].size)) {
+                    return false
+                }
+                return field[actualInfo.x][actualInfo.y].isEmpty()
             }
 
             override fun setToPos(info: SettingInfo) {
-                val actialInfo = info as SettingInfoImpl
-                field[actialInfo.x][actialInfo.y] = actialInfo.playerId
+                val actualInfo = info as SettingInfoImpl
+                field[actualInfo.x][actualInfo.y] = actualInfo.playerId
             }
         }
 
@@ -89,31 +115,41 @@ class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
     }
 
     override fun checkWinner(): String? {
-        val lines =
-            listOf(
-                listOf(field[0][0], field[0][1], field[0][2]),
-                listOf(field[1][0], field[1][1], field[1][2]),
-                listOf(field[2][0], field[2][1], field[2][2]),
-                listOf(field[0][0], field[1][0], field[2][0]),
-                listOf(field[0][1], field[1][1], field[2][1]),
-                listOf(field[0][2], field[1][2], field[2][2]),
-                listOf(field[0][0], field[1][1], field[2][2]),
-                listOf(field[0][2], field[1][1], field[2][0]),
-            )
+        for (i in field.indices) {
+            val row = field[i]
+            if (row.all { it == row[0] && it.isNotEmpty() }) {
+                return row[0]
+            }
+        }
 
-        return lines
-            .firstOrNull { line ->
-                line.all { it == "X" } || line.all { it == "O" }
-            }?.firstOrNull()
+        for (i in field.indices) {
+            val col = List(field.size) { j -> field[j][i] }
+            if (col.all { it == col[0] && it.isNotEmpty() }) {
+                return col[0]
+            }
+        }
+
+        val mainDiagonal = List(field.size) { i -> field[i][i] }
+        if (mainDiagonal.all { it == mainDiagonal[0] && it.isNotEmpty() }) {
+            return mainDiagonal[0]
+        }
+
+        val antiDiagonal = List(field.size) { i -> field[i][field.size - 1 - i] }
+        if (antiDiagonal.all { it == antiDiagonal[0] && it.isNotEmpty() }) {
+            return antiDiagonal[0]
+        }
+
+        return null
     }
 
     override fun makeMove(info: IGame.InfoForSending): IGame.GameState {
+        printField()
         val move = info as GameMove
         if (info.action == "сдаться") {
             return when (info.playerId) {
                 "X" -> IGame.GameState.CLIENT_WINS
                 "O" -> IGame.GameState.SERVER_WINS
-                else -> throw RuntimeException("invalide playerID: ${info.playerId}")
+                else -> throw RuntimeException("invalid playerID: ${info.playerId}")
             }
         }
         val settingInfo = SettingInfoImpl(playerId = move.playerId, x = move.x, y = move.y)
@@ -122,7 +158,7 @@ class TicTacToeGame : IGame<TicTacToeGame.GameMove> {
         }
         logic.setToPos(settingInfo)
         printField()
-        return when (val winner = checkWinner()) {
+        return when (checkWinner()) {
             "X" -> IGame.GameState.SERVER_WINS
             "O" -> IGame.GameState.CLIENT_WINS
             else -> if (isBoardFull()) IGame.GameState.DRAW else IGame.GameState.ONGOING
